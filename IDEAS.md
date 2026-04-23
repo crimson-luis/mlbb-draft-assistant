@@ -1,0 +1,28 @@
+TODO:
+- [x] 1. make the heroes draggable to their positions/bans.
+- [~] 2. set assigned roles (gold, exp, mid, roam and jungle) at player selection. let the user change the order (later the backend will send the order by reading the screen). ~~TASK CANCELED~~
+- [x] 3. bans can be from 3 to 5 heroes.
+- [x] 4. make a pop-up window when the mouse hover a hero in recommendations that shows:
+  - [x] 1. current hero rank (up to day).
+  - [x] 2. pick rate / win rate / ban rate.
+  - [x] 3. top 5 counters / countered by heroes with winrate percentages (add the counter relationship section and counter/cooperate relationship counter and countered by heroes from mobile legends api).
+  - [x] 4. top 5 compatible / not compatible heroes with winrate percentages (add the compatibility section and counter/cooperate relationship compatibility by heroes from mobile legends api).
+- [x] 5. make the tag below hero name clickable.
+- [x] 6. do not make the mouse show a cancel icon when dragging the hero image.
+- [ ] 7. Popover fix and features:
+  - [ ] 1. IMPORTANT! fix the visualization of the popover. currently it is down the screen and the user cannot see.
+  - [ ] 2. make the popover keep showing when the user moves the mouse inside its content.
+  - [ ] 3. show hero role after its name.
+  - [ ] 4. show hero id before its name.
+  - [ ] 5. show the date of the data update at api.
+  - [ ] 6. show all stats (magic, physical, durability, difficulty) right below hero name.
+  - [ ] 7. also show popover when the hero is picked, banned or in the pool (at all hero objects).
+  - [ ] 8. show the hero rank from https://openmlbb.fastapicloud.dev/api/heroes/rank.
+  - [ ] 9. use /api/heroes/{hero_identifier}/counters to get the counter. sub hero is the counter heroes (fix this text it is wrong) and the sub hero last property are the countered by heroes.
+  - [ ] 10. show counters and countered side by side with their percentages and percentage variation.
+  - [ ] 11. use /api/heroes/{hero_identifier}/compatibility to get the synergy heroes. sub hero are the compatible heroes, the sub hero last are the not compatible. also make this information side by side.
+  - [ ] 12. show relations using /api/heroes/{hero_identifier}/relations, below all counter and synergy info in three rows stacked vertically.
+- [ ] 8. VERY IMPORTANT! Change all usage of https://mapi.mobilelegends.com to https://openmlbb.fastapicloud.dev. To get the heroes information use https://openmlbb.fastapicloud.dev/api/heroes?size=200, this will return all of them since the other api is outdated.
+- [ ] 9. add rank selection parameter that will affect the api calls to get details using the query parameter rank (all, epic, legend, mythic, honor, glory).
+- [ ] 9. let the user select the lane that he is in to filter out recommendations.
+- [ ] 10. when clicking the tag role, and it is already filtered by its role, unfilter it.
