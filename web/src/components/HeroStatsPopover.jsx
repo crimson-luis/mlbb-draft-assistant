@@ -106,6 +106,67 @@ function SidePanel({ title, items, deltaTone }) {
   )
 }
 
+function SkeletonBar({ width = 'w-full', height = 'h-3' }) {
+  return <div className={`skeleton ${width} ${height}`} />
+}
+
+function SkeletonBody() {
+  return (
+    <>
+      {/* Stats bars: 4 short bars mirroring the real Mag/Phy/Dur/Diff row. */}
+      <div className="flex gap-2">
+        {['Mag', 'Phy', 'Dur', 'Diff'].map((label) => (
+          <div key={label} className="flex flex-1 flex-col items-center gap-0.5">
+            <div className="flex w-full items-baseline justify-between">
+              <span className="text-[9px] uppercase tracking-widest text-slate-500">{label}</span>
+              <SkeletonBar width="w-4" height="h-2" />
+            </div>
+            <SkeletonBar height="h-1" />
+          </div>
+        ))}
+      </div>
+
+      {/* Headline tile: 3 cells mirroring Win/Pick/Ban. */}
+      <div className="grid grid-cols-3 gap-2 rounded bg-slate-900/60 p-2">
+        {['Win', 'Pick', 'Ban'].map((label) => (
+          <div key={label} className="flex flex-col items-center gap-1">
+            <span className="text-[9px] uppercase tracking-widest text-slate-500">{label}</span>
+            <SkeletonBar width="w-10" height="h-3" />
+          </div>
+        ))}
+      </div>
+
+      {/* Counters / Countered by side panels (3 rows each). */}
+      <div className="flex gap-3">
+        {['Counters', 'Countered by'].map((title) => (
+          <div key={title} className="min-w-0 flex-1">
+            <div className="mb-1 text-[10px] uppercase tracking-widest text-slate-500">{title}</div>
+            <div className="space-y-1">
+              <SkeletonBar height="h-3" />
+              <SkeletonBar height="h-3" />
+              <SkeletonBar height="h-3" />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Compatible / Not compatible side panels. */}
+      <div className="flex gap-3">
+        {['Compatible', 'Not compatible'].map((title) => (
+          <div key={title} className="min-w-0 flex-1">
+            <div className="mb-1 text-[10px] uppercase tracking-widest text-slate-500">{title}</div>
+            <div className="space-y-1">
+              <SkeletonBar height="h-3" />
+              <SkeletonBar height="h-3" />
+              <SkeletonBar height="h-3" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
 function RelationRow({ title, items, tone }) {
   return (
     <div>
@@ -220,6 +281,8 @@ export default function HeroStatsPopover({ heroId, hero, rank, anchorRect, onHov
           Stats unavailable: {error}
         </div>
       )}
+
+      {loading && !data && !error && <SkeletonBody />}
 
       {data && (
         <>

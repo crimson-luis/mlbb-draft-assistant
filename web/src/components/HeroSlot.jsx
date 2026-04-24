@@ -1,19 +1,7 @@
 import { useState } from 'react'
 import { api } from '../api'
 import { rankTextTone, WrDot } from './HeroOverlay'
-
-const ROLE_STYLES = {
-  Tank: 'bg-sky-500/20 text-sky-300 ring-sky-500/30',
-  Fighter: 'bg-amber-500/20 text-amber-300 ring-amber-500/30',
-  Assassin: 'bg-rose-500/20 text-rose-300 ring-rose-500/30',
-  Mage: 'bg-violet-500/20 text-violet-300 ring-violet-500/30',
-  Marksman: 'bg-orange-500/20 text-orange-300 ring-orange-500/30',
-  Support: 'bg-emerald-500/20 text-emerald-300 ring-emerald-500/30',
-}
-
-function roleClass(role) {
-  return ROLE_STYLES[role] ?? 'bg-slate-500/20 text-slate-300 ring-slate-500/30'
-}
+import { roleBorder } from './roleStyles'
 
 export default function HeroSlot({
   hero,
@@ -28,6 +16,7 @@ export default function HeroSlot({
   stats,
   rankTotal,
   compact = false,
+  slotIndex,
 }) {
   const filled = !!hero
   const isBan = kind === 'bans'
@@ -36,11 +25,10 @@ export default function HeroSlot({
 
   const ring = dragOver
     ? 'ring-2 ring-emerald-400'
-    : selecting
-      ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-slate-950'
-      : mutedOptional
-        ? 'ring-1 ring-dashed ring-slate-700/60 hover:ring-slate-500'
-        : 'ring-1 ring-slate-700 hover:ring-slate-400'
+    : mutedOptional
+      ? 'ring-1 ring-dashed ring-slate-700/60 hover:ring-slate-500'
+      : 'ring-1 ring-slate-700 hover:ring-slate-400'
+  const pulseClass = selecting && !filled && !dragOver ? 'slot-selecting' : ''
 
   const bg = isBan
     ? mutedOptional ? 'bg-rose-950/10' : 'bg-rose-950/30'
@@ -51,8 +39,6 @@ export default function HeroSlot({
     else onSelect?.()
   }
 
-  // Bans stay compact + circular (user said "ban is perfect"). Picks get a
-  // rectangular portrait + nameplate strip matching the in-game draft layout.
   const portraitShape = compact ? 'rounded-full' : 'rounded-t'
   const handlers = {
     onClick: handleClick,
@@ -85,7 +71,7 @@ export default function HeroSlot({
       <button
         type="button"
         {...handlers}
-        className={`relative flex aspect-square w-full items-center justify-center overflow-hidden ${portraitShape} ${bg} ${ring} transition ${mutedOptional ? 'opacity-60 hover:opacity-100' : ''}`}
+        className={`relative flex aspect-square w-full items-center justify-center overflow-hidden ${portraitShape} ${bg} ${ring} ${pulseClass} transition ${mutedOptional ? 'opacity-60 hover:opacity-100' : ''}`}
         aria-label={ariaLabel}
       >
         {filled ? (
@@ -111,15 +97,19 @@ export default function HeroSlot({
     )
   }
 
-  // Non-compact (picks): rectangular portrait on top + nameplate strip below.
+  // Pick variant: 84×112 with a 84px portrait row + 28px nameplate row.
+  // The top border of the nameplate carries the role color (replaces the
+  // inline role badge pill to save vertical real estate).
+  const playerLabel = typeof slotIndex === 'number' ? `Player ${slotIndex + 1}` : 'Pick'
+  const nameplateBorder = filled ? roleBorder(hero?.role) : 'border-slate-700'
   return (
     <button
       type="button"
       {...handlers}
-      className={`flex w-full flex-col overflow-hidden rounded ${ring} transition ${mutedOptional ? 'opacity-60 hover:opacity-100' : ''}`}
+      className={`grid h-[112px] w-[84px] grid-rows-[84px_28px] overflow-hidden rounded ${ring} ${pulseClass} transition ${mutedOptional ? 'opacity-60 hover:opacity-100' : ''}`}
       aria-label={ariaLabel}
     >
-      <div className={`relative flex aspect-square w-full items-center justify-center overflow-hidden ${bg}`}>
+      <div className={`relative flex items-center justify-center overflow-hidden ${bg}`}>
         {filled ? (
           <img
             src={api.portraitUrl(hero.id)}
@@ -133,21 +123,32 @@ export default function HeroSlot({
           </div>
         )}
       </div>
-      <div className="flex w-full flex-col items-stretch gap-0.5 bg-slate-900/80 px-1 py-1 text-left">
-        <div className="flex items-center gap-1 text-[10px] font-medium text-slate-100">
-          {stats?.rank != null && (
-            <span className={`flex-none tabular-nums ${rankTextTone(stats.rank, rankTotal)}`}>
-              #{stats.rank}
+      <div className={`flex items-center gap-1 border-t-2 ${nameplateBorder} bg-slate-900/80 px-1 text-left text-[10px]`}>
+        {filled ? (
+          <>
+            {stats?.rank != null && (
+              <span className={`flex-none tabular-nums ${rankTextTone(stats.rank, rankTotal)}`}>
+                #{stats.rank}
+              </span>
+            )}
+            <span
+              className="min-w-0 flex-1 truncate font-medium text-slate-100"
+              title={hero.name}
+            >
+              {hero.name}
             </span>
-          )}
-          <span className="min-w-0 flex-1 truncate" title={filled ? hero.name : ''}>
-            {filled ? hero.name : '—'}
+            <WrDot wr={stats?.win_rate} size="xs" className="flex-none" />
+            {stats?.win_rate != null && (
+              <span className="flex-none tabular-nums text-slate-300">
+                {Math.round(stats.win_rate * 100)}%
+              </span>
+            )}
+          </>
+        ) : (
+          <span className="flex-1 text-center uppercase tracking-wider text-slate-500">
+            {playerLabel}
           </span>
-          {filled && <WrDot wr={stats?.win_rate} className="flex-none" />}
-        </div>
-        <span className={`self-start rounded px-1 text-[9px] ring-1 ring-inset ${roleClass(hero?.role)}`}>
-          {hero?.role || '—'}
-        </span>
+        )}
       </div>
     </button>
   )
