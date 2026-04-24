@@ -15,12 +15,15 @@ of a given rank bracket. Accepted values:
 
 from __future__ import annotations
 
+import logging
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import requests
+
+log = logging.getLogger("stats")
 
 STATS_BASE = os.environ.get(
     "MLBB_STATS_BASE", "https://openmlbb.fastapicloud.dev"
@@ -83,17 +86,25 @@ def _top_subs(record: dict, key: str, hero_names: dict[int, str], limit: int = 5
 def _get_rank_index(rank: str) -> tuple[dict[int, int], int]:
     """Return (hero_id -> rank_position (1-based), total_heroes) for the given tier.
 
-    Uses `/api/heroes/rank?size=200&rank=<tier>` — returns the full ranked list
-    ordered by win rate.
+    Uses `/api/heroes/rank?size=200&rank=<tier>` — the leaderboard endpoint that
+    accepts rank per the OpenAPI spec. Returns ({}, 0) on upstream failure so a
+    flaky leaderboard response doesn't kill the whole popover; `rank_position`
+    just renders as None in that case.
     """
     now = time.time()
     hit = _rank_cache.get(rank)
     if hit and now - hit[0] < CACHE_TTL:
         return hit[1], hit[2]
-    payload = _get(
-        "/api/heroes/rank",
-        {"size": 200, "rank": rank, "sort_field": "win_rate", "sort_order": "desc"},
-    )
+    try:
+        payload = _get(
+            "/api/heroes/rank",
+            {"size": 200, "rank": rank, "sort_field": "win_rate", "sort_order": "desc"},
+        )
+    except requests.RequestException as e:
+        log.warning("rank-index fetch failed (rank=%s): %s", rank, e)
+        empty: dict[int, int] = {}
+        _rank_cache[rank] = (now, empty, 0)
+        return empty, 0
     records = (payload.get("data") or {}).get("records") or []
     idx: dict[int, int] = {}
     for pos, r in enumerate(records, start=1):
@@ -115,8 +126,12 @@ def fetch_stats(hero_id: int, hero_names: dict[int, str], rank: str = DEFAULT_RA
     if hit and now - hit[0] < CACHE_TTL:
         return hit[1]
 
+    # Per openmlbb OpenAPI spec:
+    #   /counters      — accepts `rank`
+    #   /compatibility — accepts `rank`
+    #   /relations     — does NOT accept `rank` (Moonton-curated, rank-agnostic)
+    #   /api/heroes/rank — accepts `rank` (leaderboard for the rank_position badge)
     params = {"rank": rank}
-    # Fire all three upstream calls in parallel.
     fut_counters = _pool.submit(_get, f"/api/heroes/{hero_id}/counters", params)
     fut_compat = _pool.submit(_get, f"/api/heroes/{hero_id}/compatibility", params)
     fut_rel = _pool.submit(_get, f"/api/heroes/{hero_id}/relations")
