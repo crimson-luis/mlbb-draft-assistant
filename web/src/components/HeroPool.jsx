@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
+import { rankTextTone, WrDot } from './HeroOverlay'
 
 const DRAG_MIME = 'application/x-mlbb-hero'
 
@@ -26,15 +27,6 @@ function roleClass(role) {
   return ROLE_STYLES[role] ?? 'bg-slate-500/20 text-slate-300 ring-slate-500/30'
 }
 
-function banner({ editMode, selecting }) {
-  if (editMode) return { tone: 'edit', text: 'Edit mode: click heroes to add/remove them from your pool.' }
-  if (selecting) return {
-    tone: 'selecting',
-    text: `Click a hero to fill ${selecting.team} ${selecting.kind.slice(0, -1)} slot ${selecting.index + 1}.`,
-  }
-  return { tone: 'idle', text: 'Click a slot on the left or right, then pick a hero here.' }
-}
-
 export default function HeroPool({
   heroes,
   usedIds,
@@ -45,6 +37,8 @@ export default function HeroPool({
   onToggleOwned,
   onHeroEnter,
   onHeroLeave,
+  leaderboardStats,
+  rankTotal,
 }) {
   const [query, setQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState('All')
@@ -79,56 +73,56 @@ export default function HeroPool({
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [heroes, query, roleFilter])
 
-  const { tone, text } = banner({ editMode, selecting })
-  const bannerClass =
-    tone === 'edit'      ? 'border-amber-700 bg-amber-950/30 text-amber-200' :
-    tone === 'selecting' ? 'border-sky-700 bg-sky-950/30 text-sky-200' :
-                           'border-slate-800 bg-slate-900/50 text-slate-500'
-
   const handleClick = (hero) => {
     if (editMode) { onToggleOwned(hero.id); return }
     if (selecting && !usedIds.has(hero.id)) onPick(hero.id)
   }
 
+  const editHint = editMode
+    ? 'Edit mode: click heroes to add/remove them from your pool.'
+    : null
+
   return (
-    <section className="flex flex-col gap-3 rounded-lg border border-slate-800 bg-slate-900/40 p-3">
+    <section className="flex h-full min-h-0 flex-col gap-2 rounded-lg border border-slate-800 bg-slate-900/40 p-2">
       <header className="flex flex-wrap items-center gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-300">Hero pool</h2>
-        <span className="text-xs text-slate-500">{list.length} shown</span>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <input
-            type="search"
-            placeholder="Search heroes…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-sm placeholder-slate-500 focus:border-slate-400 focus:outline-none"
-          />
-          <div className="flex flex-wrap gap-1">
-            {ROLES.map((r) => (
-              <button
-                key={r}
-                onClick={() => setRoleFilter(r)}
-                className={`rounded px-2 py-1 text-xs transition ${
-                  roleFilter === r
-                    ? 'bg-slate-100 text-slate-900'
-                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                }`}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
+        <div className="flex flex-wrap items-center gap-1">
+          {ROLES.map((r) => (
+            <button
+              key={r}
+              onClick={() => setRoleFilter(r)}
+              className={`rounded px-2 py-1 text-xs transition ${
+                roleFilter === r
+                  ? 'bg-slate-100 text-slate-900'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              {r}
+            </button>
+          ))}
         </div>
+        <span className="text-xs text-slate-500">{list.length} shown</span>
+        <input
+          type="search"
+          placeholder="Search heroes…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="ml-auto rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-sm placeholder-slate-500 focus:border-slate-400 focus:outline-none"
+        />
       </header>
 
-      <div className={`rounded border px-2 py-1 text-xs ${bannerClass}`}>{text}</div>
+      {editHint && (
+        <div className="rounded border border-amber-700 bg-amber-950/30 px-2 py-1 text-xs text-amber-200">
+          {editHint}
+        </div>
+      )}
 
-      <div className="grid max-h-[60vh] grid-cols-4 gap-2 overflow-auto pr-1 sm:grid-cols-6 md:grid-cols-7 lg:grid-cols-8">
+      <div className="grid min-h-0 flex-1 grid-cols-3 gap-1 overflow-auto pr-1 sm:grid-cols-6 md:grid-cols-10 lg:grid-cols-12 xl:grid-cols-14">
         {list.map((h) => {
           const used = usedIds.has(h.id)
           const owned = ownedIds?.has(h.id)
           const interactive = editMode ? true : (!!selecting && !used)
           const draggable = !editMode && !used
+          const stats = leaderboardStats?.[h.id]
           return (
             <button
               key={h.id}
@@ -144,14 +138,14 @@ export default function HeroPool({
               onMouseEnter={(e) => onHeroEnter?.(h.id, e.currentTarget)}
               onMouseLeave={() => onHeroLeave?.()}
               onClick={() => handleClick(h)}
-              className={`group relative flex flex-col items-center gap-1 rounded-md p-1 text-left transition
+              className={`group relative flex flex-col items-center gap-0.5 rounded-md p-0.5 text-left transition
                 ${!editMode && used ? 'cursor-not-allowed opacity-30' : ''}
                 ${interactive ? 'cursor-pointer hover:bg-slate-800/70' : draggable ? 'cursor-grab hover:bg-slate-800/70 active:cursor-grabbing' : 'cursor-not-allowed'}
               `}
               aria-label={`${h.name} (${h.role})`}
               title={!editMode && used ? `${h.name} — already used` : h.name}
             >
-              <div className={`relative aspect-square w-full overflow-hidden rounded bg-slate-800 ring-1 ${
+              <div className={`relative aspect-square w-full overflow-hidden rounded-full bg-slate-800 ring-1 ${
                 editMode && owned ? 'ring-amber-400' : 'ring-slate-700 group-hover:ring-slate-400'
               }`}>
                 <img
@@ -163,15 +157,19 @@ export default function HeroPool({
                 {owned && (
                   <span
                     aria-label="in my pool"
-                    className="absolute right-0.5 top-0.5 rounded bg-amber-400/90 px-1 text-[9px] font-bold leading-4 text-slate-900"
+                    className="absolute left-0.5 top-0.5 rounded bg-amber-400/90 px-1 text-[9px] font-bold leading-4 text-slate-900"
                   >
                     ★
                   </span>
                 )}
               </div>
               <div className="flex w-full flex-col items-center gap-0.5">
-                <span className="w-full truncate text-center text-[11px] font-medium text-slate-100" title={h.name}>
-                  {h.name}
+                <span className="flex w-full items-center justify-center gap-1 truncate text-center text-[10px] font-medium text-slate-100" title={h.name}>
+                  {stats?.rank ? (
+                    <span className={`flex-none tabular-nums ${rankTextTone(stats.rank, rankTotal)}`}>#{stats.rank}</span>
+                  ) : null}
+                  <span className="min-w-0 truncate">{h.name}</span>
+                  <WrDot wr={stats?.win_rate} size="xs" className="flex-none" />
                 </span>
                 <span
                   role="button"
@@ -189,7 +187,7 @@ export default function HeroPool({
                     setRoleFilter((prev) => (prev === h.role ? 'All' : h.role))
                   }}
                   title={h.role ? (roleFilter === h.role ? `Show all roles` : `Filter pool to ${h.role}`) : ''}
-                  className={`cursor-pointer rounded px-1 text-[9px] ring-1 ring-inset hover:brightness-125 ${roleClass(h.role)}`}
+                  className={`hidden max-w-full cursor-pointer truncate rounded px-1 text-[9px] ring-1 ring-inset hover:brightness-125 md:block ${roleClass(h.role)}`}
                 >
                   {h.role || '—'}
                 </span>

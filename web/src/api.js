@@ -31,4 +31,8 @@ export const api = {
     const qs = rank ? `?rank=${encodeURIComponent(rank)}` : ''
     return request(`/api/stats/${heroId}${qs}`)
   },
+  leaderboard: ({ rank } = {}) => {
+    const qs = rank ? `?rank=${encodeURIComponent(rank)}` : ''
+    return request(`/api/leaderboard${qs}`)
+  },
 }

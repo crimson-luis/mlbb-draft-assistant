@@ -34,8 +34,11 @@ UPSTREAM_TIMEOUT = 8.0
 VALID_RANKS = {"all", "epic", "legend", "mythic", "honor", "glory"}
 DEFAULT_RANK = "mythic"
 
-# Rank-index cache: full 132-hero leaderboard keyed by rank tier. Refreshed every CACHE_TTL.
-_rank_cache: dict[str, tuple[float, dict[int, int], int]] = {}
+# Leaderboard cache: full 132-hero ranked list keyed by rank tier, refreshed every
+# CACHE_TTL. Entry shape: (timestamp, {hero_id: {rank, win_rate, pick_rate, ban_rate}},
+# total, data_updated_at_ms). Used for both the popover's rank_position badge and the
+# bulk /api/leaderboard endpoint that powers per-tile overlays.
+_rank_cache: dict[str, tuple[float, dict[int, dict], int, int | None]] = {}
 _cache: dict[tuple[int, str], tuple[float, dict]] = {}
 _pool = ThreadPoolExecutor(max_workers=8, thread_name_prefix="stats")
 
@@ -83,38 +86,70 @@ def _top_subs(record: dict, key: str, hero_names: dict[int, str], limit: int = 5
     return out
 
 
-def _get_rank_index(rank: str) -> tuple[dict[int, int], int]:
-    """Return (hero_id -> rank_position (1-based), total_heroes) for the given tier.
+def _fetch_leaderboard(rank: str) -> tuple[dict[int, dict], int, int | None]:
+    """Fetch `/api/heroes/rank?size=200&rank=<tier>` sorted by win rate.
 
-    Uses `/api/heroes/rank?size=200&rank=<tier>` — the leaderboard endpoint that
-    accepts rank per the OpenAPI spec. Returns ({}, 0) on upstream failure so a
-    flaky leaderboard response doesn't kill the whole popover; `rank_position`
-    just renders as None in that case.
+    Returns ({hero_id: {rank, win_rate, pick_rate, ban_rate}}, total, updated_at_ms).
+    On upstream failure returns ({}, 0, None) so callers can fail-open.
     """
     now = time.time()
     hit = _rank_cache.get(rank)
     if hit and now - hit[0] < CACHE_TTL:
-        return hit[1], hit[2]
+        return hit[1], hit[2], hit[3]
     try:
         payload = _get(
             "/api/heroes/rank",
             {"size": 200, "rank": rank, "sort_field": "win_rate", "sort_order": "desc"},
         )
     except requests.RequestException as e:
-        log.warning("rank-index fetch failed (rank=%s): %s", rank, e)
-        empty: dict[int, int] = {}
-        _rank_cache[rank] = (now, empty, 0)
-        return empty, 0
+        log.warning("leaderboard fetch failed (rank=%s): %s", rank, e)
+        empty: dict[int, dict] = {}
+        _rank_cache[rank] = (now, empty, 0, None)
+        return empty, 0, None
     records = (payload.get("data") or {}).get("records") or []
-    idx: dict[int, int] = {}
+    entries: dict[int, dict] = {}
+    updated_candidates: list[int] = []
     for pos, r in enumerate(records, start=1):
         rec = r.get("data") or {}
         hid = rec.get("main_heroid")
-        if hid is not None:
-            idx[int(hid)] = pos
+        if hid is None:
+            continue
+        entries[int(hid)] = {
+            "rank": pos,
+            "win_rate": rec.get("main_hero_win_rate"),
+            "pick_rate": rec.get("main_hero_appearance_rate"),
+            "ban_rate": rec.get("main_hero_ban_rate"),
+        }
+        updated = r.get("_updatedAt")
+        try:
+            if updated is not None:
+                updated_candidates.append(int(updated))
+        except (TypeError, ValueError):
+            pass
     total = len(records)
-    _rank_cache[rank] = (now, idx, total)
-    return idx, total
+    updated_at_ms = max(updated_candidates) if updated_candidates else None
+    _rank_cache[rank] = (now, entries, total, updated_at_ms)
+    return entries, total, updated_at_ms
+
+
+def _get_rank_index(rank: str) -> tuple[dict[int, int], int]:
+    """Thin projection over _fetch_leaderboard: (hero_id -> rank position, total)."""
+    entries, total, _ = _fetch_leaderboard(rank)
+    return {hid: e["rank"] for hid, e in entries.items()}, total
+
+
+def fetch_leaderboard(rank: str = DEFAULT_RANK) -> dict:
+    """Public wrapper shaped for the /api/leaderboard endpoint."""
+    rank = rank if rank in VALID_RANKS else DEFAULT_RANK
+    entries, total, updated_at_ms = _fetch_leaderboard(rank)
+    return {
+        "rank_tier": rank,
+        "rank_total": total,
+        "heroes": {str(hid): e for hid, e in entries.items()},
+        "data_updated_at_ms": updated_at_ms,
+        "fetched_at": time.time(),
+        "source": STATS_BASE,
+    }
 
 
 def fetch_stats(hero_id: int, hero_names: dict[int, str], rank: str = DEFAULT_RANK) -> dict:
