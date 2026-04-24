@@ -25,7 +25,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from recommender import recommend as score_draft
-from stats import DEFAULT_RANK, VALID_RANKS, fetch_stats
+from stats import DEFAULT_RANK, VALID_RANKS, fetch_leaderboard, fetch_stats
 
 BASE_DIR = Path(__file__).resolve().parent
 _CANDIDATES = [
@@ -111,6 +111,16 @@ def recommend(req: RecommendRequest) -> dict:
         req.only_ids,
         req.only_roles,
     )
+
+
+@app.get("/api/leaderboard")
+def leaderboard(rank: str = DEFAULT_RANK) -> dict:
+    if rank not in VALID_RANKS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"invalid rank '{rank}'. Allowed: {sorted(VALID_RANKS)}",
+        )
+    return fetch_leaderboard(rank)
 
 
 @app.get("/api/stats/{hero_id}")

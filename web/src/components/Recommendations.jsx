@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import { api } from '../api'
+import { rankTextTone, WrDot } from './HeroOverlay'
 
 const REASON_LABELS = {
   counters: (r) => `Counters ${r.target_name}`,
@@ -61,7 +62,7 @@ function ReasonPill({ reason, tip }) {
   )
 }
 
-function RecommendationCard({ rec, heroesById, onHeroEnter, onHeroLeave }) {
+function RecommendationCard({ rec, heroesById, onHeroEnter, onHeroLeave, stats, rankTotal }) {
   const scoreColor =
     rec.score > 4 ? 'text-emerald-300' :
     rec.score > 0 ? 'text-sky-300' :
@@ -76,7 +77,7 @@ function RecommendationCard({ rec, heroesById, onHeroEnter, onHeroLeave }) {
       onMouseLeave={() => onHeroLeave?.()}
       className="flex gap-3 rounded-lg border border-slate-800 bg-slate-900/60 p-3 transition hover:border-slate-600"
     >
-      <div className="h-16 w-16 flex-none overflow-hidden rounded-md bg-slate-800 ring-1 ring-slate-700">
+      <div className="relative h-16 w-16 flex-none overflow-hidden rounded-full bg-slate-800 ring-1 ring-slate-700">
         <img
           src={api.portraitUrl(rec.hero_id)}
           alt={rec.name}
@@ -84,8 +85,14 @@ function RecommendationCard({ rec, heroesById, onHeroEnter, onHeroLeave }) {
         />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="flex items-baseline gap-2">
-          <span className="truncate font-semibold text-slate-100">{rec.name}</span>
+        <div className="flex items-center gap-2">
+          <span className="flex min-w-0 items-center gap-1.5 truncate font-semibold text-slate-100">
+            {stats?.rank ? (
+              <span className={`flex-none tabular-nums ${rankTextTone(stats.rank, rankTotal)}`}>#{stats.rank}</span>
+            ) : null}
+            <span className="truncate">{rec.name}</span>
+            <WrDot wr={stats?.win_rate} className="flex-none" />
+          </span>
           <span className="text-[10px] uppercase tracking-widest text-slate-500">{rec.role}</span>
           <span className={`ml-auto text-lg font-bold tabular-nums ${scoreColor}`}>
             {rec.score > 0 ? '+' : ''}{rec.score}
@@ -103,7 +110,7 @@ function RecommendationCard({ rec, heroesById, onHeroEnter, onHeroLeave }) {
   )
 }
 
-export default function Recommendations({ recommendations, heroesById, loading, error, hasInput, filterToOwnedActive, onHeroEnter, onHeroLeave }) {
+export default function Recommendations({ recommendations, heroesById, loading, error, hasInput, filterToOwnedActive, onHeroEnter, onHeroLeave, leaderboardStats, rankTotal }) {
   return (
     <section className="flex flex-col gap-3 rounded-lg border border-slate-800 bg-slate-900/40 p-3">
       <header className="flex items-center gap-2">
@@ -142,6 +149,8 @@ export default function Recommendations({ recommendations, heroesById, loading, 
             heroesById={heroesById}
             onHeroEnter={onHeroEnter}
             onHeroLeave={onHeroLeave}
+            stats={leaderboardStats?.[rec.hero_id]}
+            rankTotal={rankTotal}
           />
         ))}
       </div>

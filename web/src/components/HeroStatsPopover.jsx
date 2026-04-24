@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { api } from '../api'
+import { wrTextTone } from './HeroOverlay'
 
 // In-memory cache keyed by `${heroId}|${rank}`. Backend caches for 1h too;
 // this just avoids re-fetching during a single session when the user re-opens.
@@ -223,7 +224,7 @@ export default function HeroStatsPopover({ heroId, hero, rank, anchorRect, onHov
       {data && (
         <>
           <div className="grid grid-cols-3 gap-2 rounded bg-slate-900/60 p-2">
-            <Headline label="Win"  value={pct(data.win_rate)}  tone="text-emerald-300" />
+            <Headline label="Win"  value={pct(data.win_rate)}  tone={wrTextTone(data.win_rate)} />
             <Headline label="Pick" value={pct(data.pick_rate)} tone="text-sky-300" />
             <Headline label="Ban"  value={pct(data.ban_rate)}  tone="text-amber-300" />
           </div>

@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 
 // Shared hover-popover controller. Used by Recommendations, HeroPool tiles,
-// and DraftBoard slots so they all drive a single floating popover rendered
+// and pick/ban slots so they all drive a single floating popover rendered
 // at the top of the tree.
 //
 // - openDelay: ms to wait before opening after mouseenter (prevents flicker).

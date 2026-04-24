@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from './api'
 import { useDraftState } from './hooks/useDraftState'
 import useHeroPopover from './hooks/useHeroPopover'
-import DraftBoard from './components/DraftBoard'
+import useLeaderboard from './hooks/useLeaderboard'
+import BanBar from './components/BanBar'
+import PickColumn from './components/PickColumn'
 import HeroPool from './components/HeroPool'
 import Recommendations from './components/Recommendations'
 import HeroStatsPopover from './components/HeroStatsPopover'
@@ -10,7 +12,13 @@ import HeroStatsPopover from './components/HeroStatsPopover'
 const OWNED_STORAGE_KEY = 'mlbb:ownedHeroes'
 const RANK_STORAGE_KEY = 'mlbb:rank'
 const LANE_STORAGE_KEY = 'mlbb:lane'
+const BAN_COUNT_STORAGE_KEY = 'mlbb:banCount'
 const RANKS = ['all', 'epic', 'legend', 'mythic', 'honor', 'glory']
+
+// Ban-count defaults by rank tier (MLBB in-game rules):
+//   Epic: 3 per team · Legend: 4 · Mythic+: 5
+// 'all' is meta (not an actual tier) — default to the most common live setting.
+const RANK_BAN_DEFAULTS = { all: 5, epic: 3, legend: 4, mythic: 5, honor: 5, glory: 5 }
 
 // Lane → roles mapping. A lane in MLBB is the position on the map; the role
 // is the hero class. This maps a selected lane to the roles typically played
@@ -52,6 +60,18 @@ function loadLane() {
   }
 }
 
+// Ban count is stored as either a number (user override) or the string
+// 'rank' (follow the rank tier's default). Anything else falls back to 'rank'.
+function loadBanCount() {
+  try {
+    const v = localStorage.getItem(BAN_COUNT_STORAGE_KEY)
+    if (v === '3' || v === '4' || v === '5') return Number(v)
+    return 'rank'
+  } catch {
+    return 'rank'
+  }
+}
+
 export default function App() {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
@@ -64,9 +84,15 @@ export default function App() {
   const [filterToOwned, setFilterToOwned] = useState(false)
   const [rank, setRank] = useState(loadRank)
   const [lane, setLane] = useState(loadLane)
+  const [banCountPref, setBanCountPref] = useState(loadBanCount)
 
   const { state, actions, usedIds, recommendPayload, selectingSlot } = useDraftState()
   const { hover: popHover, onHeroEnter, onHeroLeave, onPopoverKeep } = useHeroPopover()
+  const { statsByHeroId, rankTotal } = useLeaderboard(rank)
+
+  // Resolve the effective ban count: user override wins, otherwise follow rank.
+  const banCount = typeof banCountPref === 'number' ? banCountPref : RANK_BAN_DEFAULTS[rank] ?? 5
+  const banCountSource = typeof banCountPref === 'number' ? 'user' : 'rank'
 
   useEffect(() => {
     api.heroes().then(setData).catch((e) => setError(e.message))
@@ -85,6 +111,24 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem(LANE_STORAGE_KEY, lane) } catch { /* ignore */ }
   }, [lane])
+
+  useEffect(() => {
+    try {
+      if (typeof banCountPref === 'number') localStorage.setItem(BAN_COUNT_STORAGE_KEY, String(banCountPref))
+      else localStorage.removeItem(BAN_COUNT_STORAGE_KEY)
+    } catch { /* ignore */ }
+  }, [banCountPref])
+
+  const onBanCountChange = useCallback((n) => {
+    // Clicking the rank default while it's already selected clears the override
+    // and returns to "follow rank". Otherwise pin the user's choice.
+    setBanCountPref((prev) => {
+      const rankDefault = RANK_BAN_DEFAULTS[rank] ?? 5
+      if (n === rankDefault && prev !== 'rank') return 'rank'
+      if (n === rankDefault && prev === 'rank') return 'rank'
+      return n
+    })
+  }, [rank])
 
   const toggleOwned = useCallback((id) => {
     setOwnedIds((prev) => {
@@ -107,10 +151,20 @@ export default function App() {
     [data],
   )
 
+  // Respect the active ban count — bans beyond the visible slots shouldn't
+  // influence scoring or mark heroes as used.
+  const visibleBans = useMemo(
+    () => [
+      ...state.enemy.bans.slice(0, banCount),
+      ...state.ally.bans.slice(0, banCount),
+    ].filter((x) => x != null),
+    [state.enemy.bans, state.ally.bans, banCount],
+  )
+
   const hasInput =
     recommendPayload.enemy_picks.length +
       recommendPayload.ally_picks.length +
-      recommendPayload.bans.length >
+      visibleBans.length >
     0
 
   const filterToOwnedActive = filterToOwned && ownedIds.size > 0
@@ -132,7 +186,9 @@ export default function App() {
 
     const laneRoles = LANE_ROLES[lane]
     const payload = {
-      ...recommendPayload,
+      enemy_picks: recommendPayload.enemy_picks,
+      ally_picks: recommendPayload.ally_picks,
+      bans: visibleBans,
       ...(filterToOwnedActive ? { only_ids: [...ownedIds] } : {}),
       ...(laneRoles ? { only_roles: laneRoles } : {}),
     }
@@ -152,7 +208,7 @@ export default function App() {
       cancelled = true
       clearTimeout(t)
     }
-  }, [recommendPayload, hasInput, data, filterToOwnedActive, ownedIds, lane])
+  }, [recommendPayload, visibleBans, hasInput, data, filterToOwnedActive, ownedIds, lane])
 
   // Escape clears pending slot selection (and exits edit mode).
   useEffect(() => {
@@ -211,6 +267,28 @@ export default function App() {
                 ))}
               </select>
             </label>
+            <div
+              className="flex items-center gap-1 text-xs text-slate-400"
+              title={banCountSource === 'rank' ? 'Bans per team — default for current rank' : 'Bans per team — overridden'}
+            >
+              Bans
+              <div className="inline-flex overflow-hidden rounded ring-1 ring-slate-700">
+                {[3, 4, 5].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => onBanCountChange(n)}
+                    className={`px-1.5 py-0.5 text-xs transition ${
+                      banCount === n
+                        ? 'bg-slate-100 text-slate-900'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
             <label className="flex items-center gap-1 text-xs text-slate-400" title="Your lane — filters recommendations to the matching roles">
               Lane
               <select
@@ -261,7 +339,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="mx-auto flex max-w-[1600px] flex-col gap-4 px-6 py-4">
+      <main className="mx-auto flex max-w-[1600px] flex-col gap-3 px-6 py-4">
         {error && (
           <div className="rounded border border-rose-700 bg-rose-950/50 p-4 text-sm text-rose-200">
             Failed to load hero data: {error}
@@ -277,15 +355,29 @@ export default function App() {
 
         {data && (
           <>
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(220px,1fr)_minmax(0,3fr)_minmax(220px,1fr)]">
-              <DraftBoard
-                team="enemy"
+            <BanBar
+              state={state}
+              heroesById={heroesById}
+              actions={actions}
+              selectingSlot={selectingSlot}
+              banCount={banCount}
+              onHeroEnter={onHeroEnter}
+              onHeroLeave={onHeroLeave}
+              leaderboardStats={statsByHeroId}
+              rankTotal={rankTotal}
+            />
+
+            <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-2">
+              <PickColumn
+                team="ally"
                 state={state}
                 heroesById={heroesById}
                 actions={actions}
                 selectingSlot={selectingSlot}
                 onHeroEnter={onHeroEnter}
                 onHeroLeave={onHeroLeave}
+                leaderboardStats={statsByHeroId}
+                rankTotal={rankTotal}
               />
               <HeroPool
                 heroes={heroesList}
@@ -297,15 +389,19 @@ export default function App() {
                 onToggleOwned={toggleOwned}
                 onHeroEnter={onHeroEnter}
                 onHeroLeave={onHeroLeave}
+                leaderboardStats={statsByHeroId}
+                rankTotal={rankTotal}
               />
-              <DraftBoard
-                team="ally"
+              <PickColumn
+                team="enemy"
                 state={state}
                 heroesById={heroesById}
                 actions={actions}
                 selectingSlot={selectingSlot}
                 onHeroEnter={onHeroEnter}
                 onHeroLeave={onHeroLeave}
+                leaderboardStats={statsByHeroId}
+                rankTotal={rankTotal}
               />
             </div>
             <Recommendations
@@ -317,6 +413,8 @@ export default function App() {
               filterToOwnedActive={filterToOwnedActive}
               onHeroEnter={onHeroEnter}
               onHeroLeave={onHeroLeave}
+              leaderboardStats={statsByHeroId}
+              rankTotal={rankTotal}
             />
           </>
         )}
