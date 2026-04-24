@@ -1,28 +1,35 @@
 TODO:
-- [x] 1. make the heroes draggable to their positions/bans.
-- [~] 2. set assigned roles (gold, exp, mid, roam and jungle) at player selection. let the user change the order (later the backend will send the order by reading the screen). ~~TASK CANCELED~~
-- [x] 3. bans can be from 3 to 5 heroes.
-- [x] 4. make a pop-up window when the mouse hover a hero in recommendations that shows:
-  - [x] 1. current hero rank (up to day).
-  - [x] 2. pick rate / win rate / ban rate.
-  - [x] 3. top 5 counters / countered by heroes with winrate percentages (add the counter relationship section and counter/cooperate relationship counter and countered by heroes from mobile legends api).
-  - [x] 4. top 5 compatible / not compatible heroes with winrate percentages (add the compatibility section and counter/cooperate relationship compatibility by heroes from mobile legends api).
-- [x] 5. make the tag below hero name clickable.
-- [x] 6. do not make the mouse show a cancel icon when dragging the hero image.
-- [ ] 7. Popover fix and features:
-  - [ ] 1. IMPORTANT! fix the visualization of the popover. currently it is down the screen and the user cannot see.
-  - [ ] 2. make the popover keep showing when the user moves the mouse inside its content.
-  - [ ] 3. show hero role after its name.
-  - [ ] 4. show hero id before its name.
-  - [ ] 5. show the date of the data update at api.
-  - [ ] 6. show all stats (magic, physical, durability, difficulty) right below hero name.
-  - [ ] 7. also show popover when the hero is picked, banned or in the pool (at all hero objects).
-  - [ ] 8. show the hero rank from https://openmlbb.fastapicloud.dev/api/heroes/rank.
-  - [ ] 9. use /api/heroes/{hero_identifier}/counters to get the counter. sub hero is the counter heroes (fix this text it is wrong) and the sub hero last property are the countered by heroes.
-  - [ ] 10. show counters and countered side by side with their percentages and percentage variation.
-  - [ ] 11. use /api/heroes/{hero_identifier}/compatibility to get the synergy heroes. sub hero are the compatible heroes, the sub hero last are the not compatible. also make this information side by side.
-  - [ ] 12. show relations using /api/heroes/{hero_identifier}/relations, below all counter and synergy info in three rows stacked vertically.
-- [ ] 8. VERY IMPORTANT! Change all usage of https://mapi.mobilelegends.com to https://openmlbb.fastapicloud.dev. To get the heroes information use https://openmlbb.fastapicloud.dev/api/heroes?size=200, this will return all of them since the other api is outdated.
-- [ ] 9. add rank selection parameter that will affect the api calls to get details using the query parameter rank (all, epic, legend, mythic, honor, glory).
-- [ ] 9. let the user select the lane that he is in to filter out recommendations.
-- [ ] 10. when clicking the tag role, and it is already filtered by its role, unfilter it.
+- [x] make the heroes draggable to their positions/bans.
+- [~] . set assigned roles (gold, exp, mid, roam and jungle) at player selection. let the user change the order (later the backend will send the order by reading the screen). ~~TASK CANCELED~~
+- [x] bans can be from 3 to 5 heroes.
+- [x] make a pop-up window when the mouse hover a hero in recommendations that shows:
+  - [x] current hero rank (up to day).
+  - [x] pick rate / win rate / ban rate.
+  - [x] top 5 counters / countered by heroes with winrate percentages (add the counter relationship section and counter/cooperate relationship counter and countered by heroes from mobile legends api).
+  - [x] top 5 compatible / not compatible heroes with winrate percentages (add the compatibility section and counter/cooperate relationship compatibility by heroes from mobile legends api).
+- [x] make the tag below hero name clickable.
+- [x] do not make the mouse show a cancel icon when dragging the hero image.
+- [x] Popover fix and features:
+  - [x] IMPORTANT! fix the visualization of the popover. currently it is down the screen and the user cannot see.
+  - [x] make the popover keep showing when the user moves the mouse inside its content.
+  - [x] show hero role after its name.
+  - [x] show hero id before its name.
+  - [x] show the date of the data update at api.
+  - [x] show all stats (magic, physical, durability, difficulty) right below hero name.
+  - [x] also show popover when the hero is picked, banned or in the pool (at all hero objects).
+  - [x] show the hero rank from https://openmlbb.fastapicloud.dev/api/heroes/rank.
+  - [x] use /api/heroes/{hero_identifier}/counters to get the counter. sub hero is the counter heroes (fix this text it is wrong) and the sub hero last property are the countered by heroes.
+  - [x] show counters and countered side by side with their percentages and percentage variation.
+  - [x] use /api/heroes/{hero_identifier}/compatibility to get the synergy heroes. sub hero are the compatible heroes, the sub hero last are the not compatible. also make this information side by side.
+  - [x] show relations using /api/heroes/{hero_identifier}/relations, below all counter and synergy info in three rows stacked vertically.
+- [x] VERY IMPORTANT! Change all usage of https://mapi.mobilelegends.com to https://openmlbb.fastapicloud.dev. To get the heroes information use https://openmlbb.fastapicloud.dev/api/heroes?size=200, this will return all of them since the other api is outdated.
+- [x] add rank selection parameter that will affect the api calls to get details using the query parameter rank (all, epic, legend, mythic, honor, glory).
+- [x] let the user select the lane that he is in to filter out recommendations.
+- [x] when clicking the tag role, and it is already filtered by its role, unfilter it.
+- [ ] organize the bans and picks like it is in the game, try using the claude design plugin. bans at the top next to each outer border and picks at the side, allies left and enemies right. try to match in game current draft layout. make the hero portrait a little bit smaller. see screen pictures inside .\scraper\output\screens\draft.wepb
+- [ ] make an option with the number of bans next to the ban title. the user can select between 3, 4 or 5 bans. the default is base on the selected rank, 3 bans per team (6 total) in Epic, 4 bans per team (8 total) in Legend, and 5 bans per team (10 total) in Mythic and above. 
+- [ ] show at hero object their rank, far right and the winrate as a visual representation.
+- [ ] there should be a draft flow, that will be filled automatically when the ocr is implemented. search in the web how this works if needed.
+  - when the match is found, it is decided who picks first, the chosen  team will pick 1 hero first, the next picks are always 2 players. then the ban phase starts. the ban order depends on the rank, in mythic both teams ban 3 heroes at the first ban phase then 2 more heroes after. then the pick phase starts. alternating teams and beginning with the first pick team. This sequence must be followed until all players picked. This flow needs to run when the user is sharing the screen info to be whatched by the system but also needs to be able to run manually. when ran manually the use should be prompted with the first pick team then start simulating the draft flow. at each interaction, the current pick/ban is highlighted and the user will have to click the hero to fill that position. search the times to each iteration, apply them to the draft flow. when the ban is not selected within the time, nothing is banned and the ban is skiped/blocked. if hero not picked in manual draft flow, ask if user wants to continue or reset, if continued reset iteration (current ban or pick) timer. lock other positions that are not currently being selected. the timer should be at the top center of the draft, below the phase name (first ban phase, ...).
+  - also make a button to  stop timer
+- [ ] generate a *composition power* statistic. infer what would be good factors to represent this (Frontline, Support, Carry, Tank) (Damage Balance: 2Phys , 1Magic, 0mix, CC: Good CC chain -> cc score,game phase: Mid game), e.g. Score Breakdown: Role Diversity, +30, CC Chain, +15, Damage Mix, +10, Role Coverage, +8, Synergy Pairs, 0, Win Rate, +2, Tier Bonus. Show total score beside the timer, the ally team power to the left of the remaining time and the enemy to the right. and the details at the bottom, besides the recommendations
