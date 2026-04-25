@@ -13,6 +13,10 @@ const OWNED_STORAGE_KEY = 'mlbb:ownedHeroes'
 const RANK_STORAGE_KEY = 'mlbb:rank'
 const LANE_STORAGE_KEY = 'mlbb:lane'
 const BAN_COUNT_STORAGE_KEY = 'mlbb:banCount'
+const RECS_H_STORAGE_KEY = 'mlbb:recsH'
+const RECS_H_MIN = 80
+const RECS_H_MAX = 500
+const RECS_H_DEFAULT = 128
 const RANKS = ['all', 'epic', 'legend', 'mythic', 'honor', 'glory']
 
 // Ban-count defaults by rank tier (MLBB in-game rules):
@@ -72,6 +76,63 @@ function loadBanCount() {
   }
 }
 
+function loadRecsH() {
+  try {
+    const v = Number(localStorage.getItem(RECS_H_STORAGE_KEY))
+    if (Number.isFinite(v) && v >= RECS_H_MIN && v <= RECS_H_MAX) return v
+    return RECS_H_DEFAULT
+  } catch {
+    return RECS_H_DEFAULT
+  }
+}
+
+// Drag handle that lets the user resize the recommendations panel by dragging
+// the divider between HeroPool and Recommendations. Uses pointer capture so the
+// drag continues smoothly even if the cursor leaves the handle.
+function ResizeHandle({ height, onResize }) {
+  const startRef = useRef(null)
+  const onPointerDown = (e) => {
+    e.preventDefault()
+    startRef.current = { y: e.clientY, h: height, target: e.currentTarget, pointerId: e.pointerId }
+    try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* synthetic events lack a real pointer */ }
+    // Mirror the move/up listeners on window so the drag survives even when
+    // pointer capture isn't available (e.g. simulated PointerEvents in tests).
+    const onMove = (ev) => {
+      if (!startRef.current) return
+      const dy = ev.clientY - startRef.current.y
+      const next = Math.max(RECS_H_MIN, Math.min(RECS_H_MAX, startRef.current.h - dy))
+      onResize(next)
+    }
+    const onUp = () => {
+      const s = startRef.current
+      startRef.current = null
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+      if (s?.target && s.pointerId != null) {
+        try { s.target.releasePointerCapture(s.pointerId) } catch { /* ignore */ }
+      }
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
+  }
+  return (
+    <div
+      role="separator"
+      aria-orientation="horizontal"
+      aria-valuenow={height}
+      aria-valuemin={RECS_H_MIN}
+      aria-valuemax={RECS_H_MAX}
+      title="Drag to resize recommendations panel"
+      onPointerDown={onPointerDown}
+      className="group relative h-2 w-full cursor-row-resize touch-none select-none"
+    >
+      <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-slate-700 transition group-hover:h-0.5 group-hover:bg-slate-500" />
+    </div>
+  )
+}
+
 export default function App() {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
@@ -85,6 +146,7 @@ export default function App() {
   const [rank, setRank] = useState(loadRank)
   const [lane, setLane] = useState(loadLane)
   const [banCountPref, setBanCountPref] = useState(loadBanCount)
+  const [recsH, setRecsH] = useState(loadRecsH)
 
   const { state, actions, usedIds, recommendPayload, selectingSlot } = useDraftState()
   const { hover: popHover, onHeroEnter, onHeroLeave, onPopoverKeep } = useHeroPopover()
@@ -118,6 +180,10 @@ export default function App() {
       else localStorage.removeItem(BAN_COUNT_STORAGE_KEY)
     } catch { /* ignore */ }
   }, [banCountPref])
+
+  useEffect(() => {
+    try { localStorage.setItem(RECS_H_STORAGE_KEY, String(recsH)) } catch { /* ignore */ }
+  }, [recsH])
 
   const onBanCountChange = useCallback((n) => {
     // Clicking the rank default while it's already selected clears the override
@@ -245,9 +311,9 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="grid h-screen grid-rows-[auto_56px_minmax(0,1fr)] overflow-hidden">
       <header className="border-b border-slate-800 bg-slate-900/60 backdrop-blur">
-        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-3 px-6 py-3">
+        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-3 px-6 py-2">
           <h1 className="text-lg font-semibold tracking-tight">MLBB Draft Assistant</h1>
           {data && (
             <span className="text-xs text-slate-400">
@@ -339,46 +405,59 @@ export default function App() {
         </div>
       </header>
 
-      <main className="mx-auto flex max-w-[1600px] flex-col gap-3 px-6 py-4">
+      {/* 56px ban-bar row. When data isn't loaded yet the row stays reserved
+          (empty strip) so the main region doesn't jump once the roster lands. */}
+      <div className="min-h-0">
+        {data && (
+          <BanBar
+            state={state}
+            heroesById={heroesById}
+            actions={actions}
+            selectingSlot={selectingSlot}
+            banCount={banCount}
+            onHeroEnter={onHeroEnter}
+            onHeroLeave={onHeroLeave}
+            leaderboardStats={statsByHeroId}
+            rankTotal={rankTotal}
+          />
+        )}
+      </div>
+
+      <main className="grid min-h-0 grid-cols-[minmax(0,1fr)_minmax(0,1200px)_minmax(0,1fr)] py-2">
         {error && (
-          <div className="rounded border border-rose-700 bg-rose-950/50 p-4 text-sm text-rose-200">
-            Failed to load hero data: {error}
-            <div className="mt-1 text-xs text-rose-300">
-              Is the backend running at <code>localhost:8000</code>?
+          <div className="col-span-3 flex items-center justify-center">
+            <div className="rounded border border-rose-700 bg-rose-950/50 p-4 text-sm text-rose-200">
+              Failed to load hero data: {error}
+              <div className="mt-1 text-xs text-rose-300">
+                Is the backend running at <code>localhost:8000</code>?
+              </div>
             </div>
           </div>
         )}
 
         {!data && !error && (
-          <div className="p-10 text-center text-sm text-slate-400">Loading hero roster…</div>
+          <div className="col-span-3 flex items-center justify-center text-sm text-slate-400">
+            Loading hero roster…
+          </div>
         )}
 
         {data && (
           <>
-            <BanBar
+            <PickColumn
+              team="ally"
               state={state}
               heroesById={heroesById}
               actions={actions}
               selectingSlot={selectingSlot}
-              banCount={banCount}
               onHeroEnter={onHeroEnter}
               onHeroLeave={onHeroLeave}
               leaderboardStats={statsByHeroId}
               rankTotal={rankTotal}
             />
-
-            <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-2">
-              <PickColumn
-                team="ally"
-                state={state}
-                heroesById={heroesById}
-                actions={actions}
-                selectingSlot={selectingSlot}
-                onHeroEnter={onHeroEnter}
-                onHeroLeave={onHeroLeave}
-                leaderboardStats={statsByHeroId}
-                rankTotal={rankTotal}
-              />
+            <section
+              className="grid w-full min-h-0 min-w-0 px-2"
+              style={{ gridTemplateRows: `minmax(0,1fr) 8px ${recsH}px` }}
+            >
               <HeroPool
                 heroes={heroesList}
                 usedIds={usedIds}
@@ -392,25 +471,26 @@ export default function App() {
                 leaderboardStats={statsByHeroId}
                 rankTotal={rankTotal}
               />
-              <PickColumn
-                team="enemy"
-                state={state}
+              <ResizeHandle height={recsH} onResize={setRecsH} />
+              <Recommendations
+                recommendations={recs}
                 heroesById={heroesById}
-                actions={actions}
-                selectingSlot={selectingSlot}
+                loading={recsLoading}
+                error={recsError}
+                hasInput={hasInput}
+                filterToOwnedActive={filterToOwnedActive}
                 onHeroEnter={onHeroEnter}
                 onHeroLeave={onHeroLeave}
                 leaderboardStats={statsByHeroId}
                 rankTotal={rankTotal}
               />
-            </div>
-            <Recommendations
-              recommendations={recs}
+            </section>
+            <PickColumn
+              team="enemy"
+              state={state}
               heroesById={heroesById}
-              loading={recsLoading}
-              error={recsError}
-              hasInput={hasInput}
-              filterToOwnedActive={filterToOwnedActive}
+              actions={actions}
+              selectingSlot={selectingSlot}
               onHeroEnter={onHeroEnter}
               onHeroLeave={onHeroLeave}
               leaderboardStats={statsByHeroId}

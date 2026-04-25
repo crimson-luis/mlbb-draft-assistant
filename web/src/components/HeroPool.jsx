@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
 import { rankTextTone, WrDot } from './HeroOverlay'
+import { roleClass } from './roleStyles'
 
 const DRAG_MIME = 'application/x-mlbb-hero'
 
@@ -13,19 +14,6 @@ function hasOurDrag(dt) {
 }
 
 const ROLES = ['All', 'Tank', 'Fighter', 'Assassin', 'Mage', 'Marksman', 'Support']
-
-const ROLE_STYLES = {
-  Tank: 'bg-sky-500/20 text-sky-300 ring-sky-500/30',
-  Fighter: 'bg-amber-500/20 text-amber-300 ring-amber-500/30',
-  Assassin: 'bg-rose-500/20 text-rose-300 ring-rose-500/30',
-  Mage: 'bg-violet-500/20 text-violet-300 ring-violet-500/30',
-  Marksman: 'bg-orange-500/20 text-orange-300 ring-orange-500/30',
-  Support: 'bg-emerald-500/20 text-emerald-300 ring-emerald-500/30',
-}
-
-function roleClass(role) {
-  return ROLE_STYLES[role] ?? 'bg-slate-500/20 text-slate-300 ring-slate-500/30'
-}
 
 export default function HeroPool({
   heroes,
@@ -83,14 +71,14 @@ export default function HeroPool({
     : null
 
   return (
-    <section className="flex h-full min-h-0 flex-col gap-2 rounded-lg border border-slate-800 bg-slate-900/40 p-2">
+    <section className="flex min-h-0 flex-col gap-2 rounded-lg border border-slate-800 bg-slate-900/40 p-2">
       <header className="flex flex-wrap items-center gap-2">
         <div className="flex flex-wrap items-center gap-1">
           {ROLES.map((r) => (
             <button
               key={r}
               onClick={() => setRoleFilter(r)}
-              className={`rounded px-2 py-1 text-xs transition ${
+              className={`rounded px-2 py-0.5 text-xs transition ${
                 roleFilter === r
                   ? 'bg-slate-100 text-slate-900'
                   : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
@@ -116,7 +104,7 @@ export default function HeroPool({
         </div>
       )}
 
-      <div className="grid min-h-0 flex-1 grid-cols-3 gap-1 overflow-auto pr-1 sm:grid-cols-6 md:grid-cols-10 lg:grid-cols-12 xl:grid-cols-14">
+      <div className="grid min-h-0 flex-1 grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-1 overflow-y-auto overflow-x-hidden pr-1 [grid-auto-rows:112px]">
         {list.map((h) => {
           const used = usedIds.has(h.id)
           const owned = ownedIds?.has(h.id)
@@ -138,14 +126,14 @@ export default function HeroPool({
               onMouseEnter={(e) => onHeroEnter?.(h.id, e.currentTarget)}
               onMouseLeave={() => onHeroLeave?.()}
               onClick={() => handleClick(h)}
-              className={`group relative flex flex-col items-center gap-0.5 rounded-md p-0.5 text-left transition
+              className={`group relative flex h-[112px] flex-col items-center justify-center gap-0.5 rounded-md p-0.5 text-left transition
                 ${!editMode && used ? 'cursor-not-allowed opacity-30' : ''}
                 ${interactive ? 'cursor-pointer hover:bg-slate-800/70' : draggable ? 'cursor-grab hover:bg-slate-800/70 active:cursor-grabbing' : 'cursor-not-allowed'}
               `}
               aria-label={`${h.name} (${h.role})`}
               title={!editMode && used ? `${h.name} — already used` : h.name}
             >
-              <div className={`relative aspect-square w-full overflow-hidden rounded-full bg-slate-800 ring-1 ${
+              <div className={`relative h-[72px] w-[72px] flex-none overflow-hidden rounded-full bg-slate-800 ring-1 ${
                 editMode && owned ? 'ring-amber-400' : 'ring-slate-700 group-hover:ring-slate-400'
               }`}>
                 <img
@@ -163,35 +151,33 @@ export default function HeroPool({
                   </span>
                 )}
               </div>
-              <div className="flex w-full flex-col items-center gap-0.5">
-                <span className="flex w-full items-center justify-center gap-1 truncate text-center text-[10px] font-medium text-slate-100" title={h.name}>
-                  {stats?.rank ? (
-                    <span className={`flex-none tabular-nums ${rankTextTone(stats.rank, rankTotal)}`}>#{stats.rank}</span>
-                  ) : null}
-                  <span className="min-w-0 truncate">{h.name}</span>
-                  <WrDot wr={stats?.win_rate} size="xs" className="flex-none" />
-                </span>
-                <span
-                  role="button"
-                  tabIndex={0}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (!h.role) return
-                    setRoleFilter((prev) => (prev === h.role ? 'All' : h.role))
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key !== 'Enter' && e.key !== ' ') return
-                    e.stopPropagation()
-                    e.preventDefault()
-                    if (!h.role) return
-                    setRoleFilter((prev) => (prev === h.role ? 'All' : h.role))
-                  }}
-                  title={h.role ? (roleFilter === h.role ? `Show all roles` : `Filter pool to ${h.role}`) : ''}
-                  className={`hidden max-w-full cursor-pointer truncate rounded px-1 text-[9px] ring-1 ring-inset hover:brightness-125 md:block ${roleClass(h.role)}`}
-                >
-                  {h.role || '—'}
-                </span>
-              </div>
+              <span className="flex w-full items-center justify-center gap-1 truncate text-center text-[10px] font-medium leading-none text-slate-100" title={h.name}>
+                {stats?.rank ? (
+                  <span className={`flex-none tabular-nums ${rankTextTone(stats.rank, rankTotal)}`}>#{stats.rank}</span>
+                ) : null}
+                <span className="min-w-0 truncate">{h.name}</span>
+                <WrDot wr={stats?.win_rate} size="xs" className="flex-none" />
+              </span>
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (!h.role) return
+                  setRoleFilter((prev) => (prev === h.role ? 'All' : h.role))
+                }}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter' && e.key !== ' ') return
+                  e.stopPropagation()
+                  e.preventDefault()
+                  if (!h.role) return
+                  setRoleFilter((prev) => (prev === h.role ? 'All' : h.role))
+                }}
+                title={h.role ? (roleFilter === h.role ? `Show all roles` : `Filter pool to ${h.role}`) : ''}
+                className={`max-w-full cursor-pointer truncate rounded px-1 text-[9px] leading-4 ring-1 ring-inset hover:brightness-110 ${roleClass(h.role)}`}
+              >
+                {h.role || '—'}
+              </span>
             </button>
           )
         })}
