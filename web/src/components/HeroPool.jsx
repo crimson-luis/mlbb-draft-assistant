@@ -1,23 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import { rankTextTone, WrDot } from './HeroOverlay'
 import { LANE_LABELS, LANE_ORDER, LANE_ROLES } from '../lanes'
 
-const DRAG_MIME = 'application/x-mlbb-hero'
-
-function hasOurDrag(dt) {
-  if (!dt) return false
-  const t = dt.types
-  if (!t) return false
-  for (let i = 0; i < t.length; i++) if (t[i] === DRAG_MIME) return true
-  return false
-}
-
-function getDraggedHeroId(dt) {
-  const raw = dt?.getData(DRAG_MIME) || dt?.getData('text/plain')
-  const id = Number.parseInt(raw, 10)
-  return Number.isFinite(id) ? id : null
-}
+const DRAG_START_THRESHOLD = 8
 
 const TEAM_DROP_ZONES = [
   {
@@ -35,6 +21,42 @@ const TEAM_DROP_ZONES = [
     text: 'text-rose-100/80',
   },
 ]
+
+function teamFromClientX(x) {
+  return x < window.innerWidth / 2 ? 'ally' : 'enemy'
+}
+
+function boundsFromElement(element) {
+  if (!element) return null
+  const rect = element.getBoundingClientRect()
+  return {
+    left: rect.left,
+    top: rect.top,
+    width: rect.width,
+    height: rect.height,
+  }
+}
+
+function pointInBounds(x, y, bounds) {
+  return !!bounds &&
+    x >= bounds.left &&
+    x <= bounds.left + bounds.width &&
+    y >= bounds.top &&
+    y <= bounds.top + bounds.height
+}
+
+function slotFromPoint(x, y) {
+  const element = document.elementFromPoint(x, y)
+  const slot = element?.closest?.('[data-draft-slot="true"]')
+  if (!slot) return null
+
+  const { draftTeam: team, draftKind: kind, draftIndex } = slot.dataset
+  const index = Number.parseInt(draftIndex, 10)
+  if ((team !== 'ally' && team !== 'enemy') || (kind !== 'picks' && kind !== 'bans') || !Number.isFinite(index)) {
+    return null
+  }
+  return { team, kind, index, bounds: boundsFromElement(slot) }
+}
 
 const ROLES = ['All', 'Tank', 'Fighter', 'Assassin', 'Mage', 'Marksman', 'Support']
 const ROLE_LABELS = { All: 'All Roles' }
@@ -85,14 +107,18 @@ export default function HeroPool({
   leaderboardStats,
   rankTotal,
   onDropToTeam,
+  onDropToSlot,
 }) {
   const [query, setQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState('All')
   const [laneFilter, setLaneFilter] = useState('any')
   const [filterMode, setFilterMode] = useState(loadFilterMode)
   const [sort, setSort] = useState(loadSort)
-  const [draggingHeroId, setDraggingHeroId] = useState(null)
-  const [dropHoverTeam, setDropHoverTeam] = useState(null)
+  const [dragState, setDragState] = useState(null)
+  const poolRef = useRef(null)
+  const pendingDragRef = useRef(null)
+  const removePointerListenersRef = useRef(null)
+  const suppressClickRef = useRef(false)
 
   useEffect(() => {
     try { localStorage.setItem(FILTER_MODE_STORAGE_KEY, filterMode) } catch { /* ignore */ }
@@ -114,39 +140,50 @@ export default function HeroPool({
       return { field, dir: SORT_FIELD_BY_VALUE[field]?.defaultDir ?? 'asc' }
     })
   }
+
   const toggleSortDir = () => {
     setSort((prev) => ({ field: prev.field, dir: prev.dir === 'asc' ? 'desc' : 'asc' }))
   }
 
-  // Suppress the native "not-allowed" cursor while dragging a hero anywhere on
-  // the page. Without a document-level preventDefault the browser only accepts
-  // drops inside HeroSlot; everywhere else it shows the cancel cursor, which
-  // is jarring because we render the drag with custom visuals.
-  useEffect(() => {
-    const onDragOver = (e) => {
-      if (!hasOurDrag(e.dataTransfer)) return
-      e.preventDefault()
-      e.dataTransfer.dropEffect = 'move'
-    }
-    const onDrop = (e) => {
-      if (!hasOurDrag(e.dataTransfer)) return
-      e.preventDefault()
-      setDraggingHeroId(null)
-      setDropHoverTeam(null)
-    }
-    const onDragEnd = () => {
-      setDraggingHeroId(null)
-      setDropHoverTeam(null)
-    }
-    document.addEventListener('dragover', onDragOver)
-    document.addEventListener('drop', onDrop)
-    document.addEventListener('dragend', onDragEnd)
-    return () => {
-      document.removeEventListener('dragover', onDragOver)
-      document.removeEventListener('drop', onDrop)
-      document.removeEventListener('dragend', onDragEnd)
-    }
+  const removePointerListeners = useCallback(() => {
+    removePointerListenersRef.current?.()
+    removePointerListenersRef.current = null
   }, [])
+
+  const cleanupPointerDrag = useCallback(() => {
+    const pending = pendingDragRef.current
+    if (pending?.target && pending.pointerId != null) {
+      try { pending.target.releasePointerCapture(pending.pointerId) } catch { /* ignore */ }
+    }
+    pendingDragRef.current = null
+    removePointerListeners()
+    setDragState(null)
+  }, [removePointerListeners])
+
+  const cancelPointerDrag = useCallback(() => {
+    suppressClickRef.current = false
+    cleanupPointerDrag()
+  }, [cleanupPointerDrag])
+
+  useEffect(() => () => cleanupPointerDrag(), [cleanupPointerDrag])
+
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') cancelPointerDrag()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('blur', cancelPointerDrag)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('blur', cancelPointerDrag)
+    }
+  }, [cancelPointerDrag])
+
+  useEffect(() => {
+    if (!editMode && onDropToTeam) return undefined
+    const id = window.setTimeout(cancelPointerDrag, 0)
+    return () => window.clearTimeout(id)
+  }, [cancelPointerDrag, editMode, onDropToTeam])
 
   const list = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -185,6 +222,10 @@ export default function HeroPool({
   }, [heroes, query, roleFilter, laneFilter, filterMode, sort, leaderboardStats])
 
   const handleClick = (hero) => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false
+      return
+    }
     if (editMode) { onToggleOwned(hero.id); return }
     if (selecting && !usedIds.has(hero.id)) onPick(hero.id)
   }
@@ -193,57 +234,155 @@ export default function HeroPool({
     ? 'Edit mode: click heroes to add/remove them from your pool.'
     : null
 
-  const teamDropActive = draggingHeroId != null && !editMode && !!onDropToTeam
-  const teamDropHandlers = (team) => ({
-    onDragEnter: (e) => {
-      if (!hasOurDrag(e.dataTransfer)) return
-      e.preventDefault()
-      e.stopPropagation()
-      setDropHoverTeam((prev) => (prev === team ? prev : team))
-    },
-    onDragOver: (e) => {
-      if (!hasOurDrag(e.dataTransfer)) return
-      e.preventDefault()
-      e.stopPropagation()
-      e.dataTransfer.dropEffect = 'move'
-      setDropHoverTeam((prev) => (prev === team ? prev : team))
-    },
-    onDragLeave: () => {
-      setDropHoverTeam((prev) => (prev === team ? null : prev))
-    },
-    onDrop: (e) => {
-      if (!hasOurDrag(e.dataTransfer)) return
-      e.preventDefault()
-      e.stopPropagation()
-      const heroId = getDraggedHeroId(e.dataTransfer)
-      setDraggingHeroId(null)
-      setDropHoverTeam(null)
-      if (heroId != null) onDropToTeam(team, heroId)
-    },
-  })
+  const startTeamDrag = (hero, canTeamDrag) => (e) => {
+    if (!canTeamDrag || e.button !== 0) return
+
+    suppressClickRef.current = false
+    cleanupPointerDrag()
+
+    const pointerId = e.pointerId
+    const target = e.currentTarget
+    pendingDragRef.current = {
+      active: false,
+      hero,
+      pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      target,
+    }
+
+    try { target.setPointerCapture(pointerId) } catch { /* ignore */ }
+
+    const onPointerMove = (ev) => {
+      const pending = pendingDragRef.current
+      if (!pending || pending.pointerId !== ev.pointerId) return
+
+      const bounds = boundsFromElement(poolRef.current)
+      const dx = ev.clientX - pending.startX
+      const dy = ev.clientY - pending.startY
+      const movedEnough = Math.hypot(dx, dy) >= DRAG_START_THRESHOLD
+      if (!pending.active && !movedEnough) return
+
+      if (!pending.active) {
+        pending.active = true
+        onHeroLeave?.()
+      }
+
+      const insidePool = pointInBounds(ev.clientX, ev.clientY, bounds)
+      ev.preventDefault()
+      setDragState({
+        hero: pending.hero,
+        team: teamFromClientX(ev.clientX),
+        x: ev.clientX,
+        y: ev.clientY,
+        bounds,
+        slot: insidePool || !onDropToSlot ? null : slotFromPoint(ev.clientX, ev.clientY),
+      })
+    }
+
+    const onPointerUp = (ev) => {
+      const pending = pendingDragRef.current
+      if (!pending || pending.pointerId !== ev.pointerId) return
+
+      const { active, hero: pendingHero } = pending
+      const bounds = boundsFromElement(poolRef.current)
+      const insidePool = pointInBounds(ev.clientX, ev.clientY, bounds)
+      const team = teamFromClientX(ev.clientX)
+      const slot = insidePool ? null : slotFromPoint(ev.clientX, ev.clientY)
+      cleanupPointerDrag()
+
+      if (!active) return
+
+      ev.preventDefault()
+      suppressClickRef.current = true
+      window.setTimeout(() => {
+        suppressClickRef.current = false
+      }, 0)
+
+      if (slot) {
+        onDropToSlot?.(slot, pendingHero.id)
+      } else if (insidePool) {
+        onDropToTeam?.(team, pendingHero.id)
+      }
+    }
+
+    const onPointerCancel = (ev) => {
+      const pending = pendingDragRef.current
+      if (!pending || pending.pointerId !== ev.pointerId) return
+      cancelPointerDrag()
+    }
+
+    window.addEventListener('pointermove', onPointerMove, { passive: false })
+    window.addEventListener('pointerup', onPointerUp)
+    window.addEventListener('pointercancel', onPointerCancel)
+    removePointerListenersRef.current = () => {
+      window.removeEventListener('pointermove', onPointerMove)
+      window.removeEventListener('pointerup', onPointerUp)
+      window.removeEventListener('pointercancel', onPointerCancel)
+    }
+  }
 
   return (
-    <section className="relative flex min-h-0 flex-col gap-1 overflow-hidden rounded-lg border border-slate-800 bg-slate-900/40 p-1.5 lg:gap-2 lg:p-2">
-      {teamDropActive && (
-        <div className="absolute inset-0 z-20 grid grid-cols-2 overflow-hidden rounded-lg">
-          {TEAM_DROP_ZONES.map((zone) => {
-            const isActive = dropHoverTeam === zone.team
-            return (
-              <div
-                key={zone.team}
-                {...teamDropHandlers(zone.team)}
-                className={`relative flex items-center justify-center ring-1 ring-inset transition-colors duration-150 ${
-                  isActive ? zone.active : zone.base
-                }`}
-              >
-                <div className="pointer-events-none rounded border border-white/10 bg-slate-950/35 px-3 py-1.5 text-[10px] font-semibold uppercase shadow-sm backdrop-blur-sm">
-                  <span className={zone.text}>{zone.label}</span>
-                </div>
-              </div>
-            )
-          })}
-        </div>
+    <section ref={poolRef} className="relative flex min-h-0 flex-col gap-1 overflow-hidden rounded-lg border border-slate-800 bg-slate-900/40 p-1.5 lg:gap-2 lg:p-2">
+      {dragState && (
+        <>
+          {dragState.bounds && (
+            <div
+              className="pointer-events-none fixed z-50 grid grid-cols-2 overflow-hidden rounded-lg"
+              style={{
+                left: dragState.bounds.left,
+                top: dragState.bounds.top,
+                width: dragState.bounds.width,
+                height: dragState.bounds.height,
+              }}
+            >
+              {TEAM_DROP_ZONES.map((zone) => {
+                const isActive = dragState.team === zone.team
+                return (
+                  <div
+                    key={zone.team}
+                    className={`relative flex items-center justify-center ring-1 ring-inset transition-colors duration-150 ${
+                      isActive ? zone.active : zone.base
+                    }`}
+                  >
+                    <div className="pointer-events-none rounded border border-white/10 bg-slate-950/35 px-3 py-1.5 text-[10px] font-semibold uppercase shadow-sm backdrop-blur-sm">
+                      <span className={zone.text}>{zone.label}</span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          {dragState.slot?.bounds && (
+            <div
+              aria-hidden="true"
+              className={`pointer-events-none fixed z-[55] bg-emerald-400/10 ring-2 ring-inset ring-emerald-300 shadow-lg shadow-emerald-400/30 ${
+                dragState.slot.kind === 'bans' ? 'rounded-full' : 'rounded-md'
+              }`}
+              style={{
+                left: dragState.slot.bounds.left,
+                top: dragState.slot.bounds.top,
+                width: dragState.slot.bounds.width,
+                height: dragState.slot.bounds.height,
+              }}
+            />
+          )}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none fixed z-[60] flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-full border border-white/15 bg-slate-950/85 py-1 pl-1 pr-3 text-xs font-semibold text-slate-100 shadow-2xl"
+            style={{ left: dragState.x, top: dragState.y }}
+          >
+            <img
+              src={api.portraitUrl(dragState.hero.id)}
+              alt=""
+              draggable={false}
+              className="h-10 w-10 rounded-full object-cover ring-1 ring-slate-500"
+            />
+            <span>{dragState.hero.name}</span>
+          </div>
+        </>
       )}
+
       <header className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="inline-flex overflow-hidden rounded ring-1 ring-slate-700">
           {['lane', 'role'].map((m) => (
@@ -309,14 +448,14 @@ export default function HeroPool({
             type="button"
             onClick={toggleSortDir}
             aria-label={`Sort direction: ${sort.dir === 'asc' ? 'ascending' : 'descending'}`}
-            title={sort.dir === 'asc' ? 'Ascending — click to flip' : 'Descending — click to flip'}
+            title={sort.dir === 'asc' ? 'Ascending - click to flip' : 'Descending - click to flip'}
             className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-200 hover:bg-slate-700 focus:border-slate-400 focus:outline-none"
           >
-            {sort.dir === 'asc' ? '↑' : '↓'}
+            {sort.dir === 'asc' ? '\u2191' : '\u2193'}
           </button>
           <input
             type="search"
-            placeholder="Search heroes…"
+            placeholder="Search heroes..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="min-w-[160px] flex-1 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-sm placeholder-slate-500 focus:border-slate-400 focus:outline-none sm:w-[180px] sm:flex-none"
@@ -335,35 +474,25 @@ export default function HeroPool({
           const used = usedIds.has(h.id)
           const owned = ownedIds?.has(h.id)
           const interactive = editMode ? true : (!!selecting && !used)
-          const draggable = !editMode && !used
+          const canTeamDrag = !editMode && !used && !!onDropToTeam
           const stats = leaderboardStats?.[h.id]
           return (
             <button
               key={h.id}
               type="button"
-              disabled={!interactive && !draggable}
-              draggable={draggable}
-              onDragStart={(e) => {
-                e.dataTransfer.setData(DRAG_MIME, String(h.id))
-                e.dataTransfer.setData('text/plain', String(h.id))
-                e.dataTransfer.effectAllowed = 'move'
-                setDraggingHeroId(h.id)
-                setDropHoverTeam(null)
-                onHeroLeave?.()
-              }}
-              onDragEnd={() => {
-                setDraggingHeroId(null)
-                setDropHoverTeam(null)
-              }}
+              disabled={!interactive && !canTeamDrag}
+              onPointerDown={startTeamDrag(h, canTeamDrag)}
               onMouseEnter={(e) => onHeroEnter?.(h.id, e.currentTarget)}
               onMouseLeave={() => onHeroLeave?.()}
               onClick={() => handleClick(h)}
               className={`group relative flex h-24 flex-col items-center justify-center gap-0.5 rounded-md p-0.5 text-left transition sm:h-[104px] lg:h-[112px]
                 ${!editMode && used ? 'cursor-not-allowed opacity-30' : ''}
-                ${interactive ? 'cursor-pointer hover:bg-slate-800/70' : draggable ? 'cursor-grab hover:bg-slate-800/70 active:cursor-grabbing' : 'cursor-not-allowed'}
+                ${canTeamDrag ? 'touch-none' : ''}
+                ${interactive ? 'cursor-pointer hover:bg-slate-800/70' : canTeamDrag ? 'cursor-grab hover:bg-slate-800/70 active:cursor-grabbing' : 'cursor-not-allowed'}
               `}
+              aria-grabbed={dragState?.hero.id === h.id}
               aria-label={`${h.name} (${h.role})`}
-              title={!editMode && used ? `${h.name} — already used` : h.name}
+              title={!editMode && used ? `${h.name} - already used` : h.name}
             >
               <div className={`relative h-14 w-14 flex-none overflow-hidden rounded-full bg-slate-800 ring-1 sm:h-16 sm:w-16 lg:h-[72px] lg:w-[72px] ${
                 editMode && owned ? 'ring-amber-400' : 'ring-slate-700 group-hover:ring-slate-400'
@@ -371,6 +500,7 @@ export default function HeroPool({
                 <img
                   src={api.portraitUrl(h.id)}
                   alt={h.name}
+                  draggable={false}
                   loading="lazy"
                   className="h-full w-full object-cover"
                 />
@@ -379,7 +509,7 @@ export default function HeroPool({
                     aria-label="in my pool"
                     className="absolute left-0.5 top-0.5 rounded bg-amber-400/90 px-1 text-[9px] font-bold leading-4 text-slate-900"
                   >
-                    ★
+                    &#9733;
                   </span>
                 )}
               </div>
