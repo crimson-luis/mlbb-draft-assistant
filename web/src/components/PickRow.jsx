@@ -4,11 +4,9 @@ import { rankTextTone, WrDot } from './HeroOverlay'
 
 const DRAG_MIME = 'application/x-mlbb-hero'
 
-// Wide pick row. Spans the full pick-column width; the hero portrait extends
-// from the screen edge toward the center of the viewport, fading to transparent
-// via a CSS mask (opacity of the rendered image stays at 1 — only the mask
-// fades). The Player label sits at the screen edge (outer side), with
-// rank / name / WR% surfacing when a hero is placed.
+// Wide pick row. The hero portrait fills the entire row, fading toward the
+// HeroPool side via a CSS mask. A bottom-anchored info strip overlays the
+// portrait: "PLAYER N" while empty, "#rank Name WR%" once a hero is dropped.
 //
 // Click/select/clear/drop behavior mirrors the previous HeroSlot pick variant.
 export default function PickRow({
@@ -28,15 +26,19 @@ export default function PickRow({
   const filled = !!hero
   const [dragOver, setDragOver] = useState(false)
 
-  // Ally sits at the left edge → portrait opaque on left, transparent on right
-  // (fades toward center). Enemy mirrors.
-  const maskImage = `linear-gradient(${isAlly ? 'to right' : 'to left'}, black 0%, black 35%, transparent 95%)`
-  const rowDir = isAlly ? 'flex-row' : 'flex-row-reverse'
-  const labelAlign = isAlly ? 'items-start text-left' : 'items-end text-right'
-  // Outer edge: 0 padding (text hugs screen edge). Inner edge: 8px breathing
-  // room before the portrait fade begins.
-  const labelPad = isAlly ? 'pl-1 pr-2' : 'pr-1 pl-2'
-  const objectPos = isAlly ? 'left center' : 'right center'
+  // Full-body art is portrait-oriented; anchor the top of the image so faces
+  // stay visible in the 112px row. Horizontally we keep the hero on their team
+  // side so they don't drift toward the HeroPool.
+  const objectPos = isAlly ? 'left top' : 'right top'
+
+  // Subtle fade where the row meets the central HeroPool, so the image doesn't
+  // clip with a hard edge.
+  const maskImage = `linear-gradient(${isAlly ? 'to right' : 'to left'}, black 0%, black 80%, transparent 100%)`
+
+  // Info strip mirrors the team side: ally aligned to the left (screen) edge,
+  // enemy to the right.
+  const stripAlign = isAlly ? 'justify-start text-left' : 'justify-end text-right'
+  const stripFlow = isAlly ? '' : 'flex-row-reverse'
 
   const ringBase = dragOver
     ? 'ring-2 ring-inset ring-emerald-400'
@@ -79,47 +81,19 @@ export default function PickRow({
       type="button"
       {...handlers}
       aria-label={ariaLabel}
-      className={`relative flex ${rowDir} h-[112px] w-full cursor-pointer items-stretch overflow-hidden ${pulseClass} ${ringBase} transition`}
+      className={`relative block h-[112px] w-full cursor-pointer overflow-hidden ${pulseClass} ${ringBase} transition`}
     >
-      {/* Label column, anchored to the screen edge. Stays above the portrait
-          via z-10 so the mask fade never eats into the text. */}
-      <div className={`relative z-10 flex w-[140px] flex-none flex-col justify-center gap-0.5 ${labelAlign} ${labelPad}`}>
-        {filled ? (
-          <>
-            <div className={`flex w-full items-center gap-1.5 ${isAlly ? '' : 'flex-row-reverse'}`}>
-              {stats?.rank != null && (
-                <span className={`flex-none text-[11px] font-semibold tabular-nums ${rankTextTone(stats.rank, rankTotal)}`}>
-                  #{stats.rank}
-                </span>
-              )}
-              <span className="min-w-0 truncate text-sm font-semibold text-slate-100">{hero.name}</span>
-            </div>
-            <div className={`flex w-full items-center gap-1 text-[10px] text-slate-400 ${isAlly ? '' : 'flex-row-reverse'}`}>
-              <WrDot wr={stats?.win_rate} size="xs" />
-              {stats?.win_rate != null && (
-                <span className="tabular-nums">{Math.round(stats.win_rate * 100)}%</span>
-              )}
-            </div>
-          </>
-        ) : (
-          <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">
-            Player {slotIndex + 1}
-          </span>
-        )}
-      </div>
-
-      {/* Portrait area — flex-1 fills the rest of the pick column width. The
-          <img> uses mask-image to fade its inner edge; opacity stays at 1. */}
-      <div className="relative min-w-0 flex-1 overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden">
+        {/* Portrait fills the pane; mask fades its inner edge toward HeroPool. */}
         {filled ? (
           <img
-            src={api.portraitUrl(hero.id)}
+            src={api.portraitFullUrl(hero.id)}
             alt=""
             draggable={false}
             style={{
+              objectPosition: objectPos,
               WebkitMaskImage: maskImage,
               maskImage,
-              objectPosition: objectPos,
             }}
             className="absolute inset-0 h-full w-full object-cover"
           />
@@ -128,6 +102,29 @@ export default function PickRow({
             +
           </div>
         )}
+
+        {/* Bottom info strip — translucent black bar pinned to the bottom of
+            the portrait pane, content hugs the screen-edge side. */}
+        <div className={`pointer-events-none absolute inset-x-0 bottom-0 flex h-7 items-center bg-black/50 px-2 ${stripAlign}`}>
+          {filled ? (
+            <div className={`flex min-w-0 items-center gap-1.5 ${stripFlow}`}>
+              {stats?.rank != null && (
+                <span className={`flex-none text-[11px] font-semibold tabular-nums ${rankTextTone(stats.rank, rankTotal)}`}>
+                  #{stats.rank}
+                </span>
+              )}
+              <span className="min-w-0 truncate text-sm font-semibold text-slate-100">{hero.name}</span>
+              <span className={`flex flex-none items-center gap-1 text-[11px] tabular-nums text-slate-200 ${stripFlow}`}>
+                <WrDot wr={stats?.win_rate} size="xs" />
+                {stats?.win_rate != null && <span>{Math.round(stats.win_rate * 100)}%</span>}
+              </span>
+            </div>
+          ) : (
+            <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-300">
+              Player {slotIndex + 1}
+            </span>
+          )}
+        </div>
       </div>
     </button>
   )

@@ -8,6 +8,7 @@ import PickColumn from './components/PickColumn'
 import HeroPool from './components/HeroPool'
 import Recommendations from './components/Recommendations'
 import HeroStatsPopover from './components/HeroStatsPopover'
+import { LANE_ROLES, LANES, LANE_LABELS } from './lanes'
 
 const OWNED_STORAGE_KEY = 'mlbb:ownedHeroes'
 const RANK_STORAGE_KEY = 'mlbb:rank'
@@ -23,19 +24,6 @@ const RANKS = ['all', 'epic', 'legend', 'mythic', 'honor', 'glory']
 //   Epic: 3 per team · Legend: 4 · Mythic+: 5
 // 'all' is meta (not an actual tier) — default to the most common live setting.
 const RANK_BAN_DEFAULTS = { all: 5, epic: 3, legend: 4, mythic: 5, honor: 5, glory: 5 }
-
-// Lane → roles mapping. A lane in MLBB is the position on the map; the role
-// is the hero class. This maps a selected lane to the roles typically played
-// in that lane, so selecting "Gold" filters recs to Marksmen, etc.
-const LANE_ROLES = {
-  any: null,
-  gold: ['Marksman'],
-  exp: ['Fighter'],
-  mid: ['Mage'],
-  jungle: ['Assassin'],
-  roam: ['Tank', 'Support'],
-}
-const LANES = Object.keys(LANE_ROLES)
 
 function loadOwned() {
   try {
@@ -363,7 +351,7 @@ export default function App() {
                 className="rounded bg-slate-800 px-1 py-0.5 text-xs text-slate-200 ring-1 ring-slate-700 focus:outline-none"
               >
                 {LANES.map((l) => (
-                  <option key={l} value={l}>{l}</option>
+                  <option key={l} value={l}>{LANE_LABELS[l] ?? l}</option>
                 ))}
               </select>
             </label>

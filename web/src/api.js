@@ -17,6 +17,7 @@ export const api = {
   health: () => request('/api/health'),
   heroes: () => request('/api/heroes'),
   portraitUrl: (heroId) => `${BASE}/api/portrait/${heroId}`,
+  portraitFullUrl: (heroId) => `${BASE}/api/portrait/${heroId}/full`,
   recommend: ({ enemy_picks = [], ally_picks = [], bans = [], only_ids, only_roles } = {}) => {
     const body = { enemy_picks, ally_picks, bans }
     if (only_ids && only_ids.length > 0) body.only_ids = only_ids

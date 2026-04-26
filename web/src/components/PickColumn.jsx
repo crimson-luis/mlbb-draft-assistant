@@ -23,10 +23,10 @@ export default function PickColumn({
 }) {
   const meta = TEAM_META[team]
   const isAlly = team === 'ally'
-  const headerEdge = isAlly ? 'pl-1 justify-start' : 'pr-1 justify-end'
+  const headerEdge = isAlly ? 'justify-start' : 'justify-end'
 
   return (
-    <section className="flex flex-col self-start">
+    <section className="flex flex-col self-start px-3">
       <h2 className={`flex h-6 items-center text-[10px] font-semibold uppercase tracking-widest ${meta.title} ${headerEdge}`}>
         {meta.label}
       </h2>
