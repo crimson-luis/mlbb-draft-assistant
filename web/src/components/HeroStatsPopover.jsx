@@ -239,8 +239,6 @@ export default function HeroStatsPopover({ heroId, hero, rank, anchorRect, onHov
   const displayName = data?.name ?? hero?.name
   const displayRole = hero?.role || ''
   const updated = formatUpdated(data?.data_updated_at_ms)
-  // abilityshow from openmlbb is [durability, physical, magic, difficulty]
-  // but local heroes.json scraped from mapi stored them as explicit keys.
   const heroStats = hero?.stats || {}
   const rankPos = data?.rank_position
   const rankTotal = data?.rank_total

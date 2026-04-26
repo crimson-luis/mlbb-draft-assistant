@@ -67,61 +67,50 @@ The scraper runs once (or periodically to catch new heroes). The backend serves 
 
 ## MLBB API Reference (verified)
 
-Base: `https://mapi.mobilelegends.com`
+Base: `https://openmlbb.fastapicloud.dev`
 
-### `GET /hero/list`
-Returns the full hero roster. Response shape:
+All successful responses share the envelope:
 ```json
-{
-  "code": 2000,
-  "message": "SUCCESS",
-  "data": [
-    {
-      "name": "Miya",
-      "heroid": "1",
-      "key": "//indoch.s3.ml.moonlian.com/web/madmin/image_a844f9aa51baefa6878801edd85fec5e.png"
-    }
-  ]
-}
+{ "code": 0, "message": "OK", "data": { "records": [ ... ], "total": <int> } }
 ```
-Note: `key` is a protocol-relative URL. Prefix with `https:` before fetching. 124 heroes as of last scrape.
 
-### `GET /hero/detail?id={heroid}`
-Rich per-hero data. Key fields:
+### `GET /api/heroes?size=200&lang=en`
+Paginated hero list. Each `data.records[i].data` carries:
 ```json
 {
-  "code": 2000,
-  "data": {
-    "name": "Miya",
-    "type": "Marksman",
-    "cover_picture": "https://...",
-    "gallery_picture": "https://...",
-    "mag": "40",    // magic damage rating (0–100)
-    "phy": "70",    // physical damage rating
-    "alive": "10",  // durability rating
-    "diff": "10",   // difficulty rating
-    "skill": {
-      "skill": [ { "name": "...", "icon": "...", "des": "...", "tips": "..." } ],
-      "item": { "main": {...}, "secondary": {...}, "battle_first": {...}, "battle_second": {...}, "tips": "..." }
-    },
-    "gear": {
-      "out_pack": [ { "equipment_id": 2008, "equip": { "icon": "...", "name": "...", "des": ["..."] } } ],
-      "out_pack_tips": "..."
-    },
-    "counters": {
-      "best":     { "heroid": "20", "name": "Lolita",   "icon": "...", "best_mate_tips":   "..." },
-      "counters": { "heroid": "49", "name": "Hylos",    "icon": "...", "restrain_hero_tips": "..." },
-      "countered":{ "heroid": "21", "name": "Hayabusa", "icon": "...", "by_restrain_tips": "..." }
-    }
+  "hero_id": 1,
+  "hero": { "data": { "name": "Miya", "sortlabel": ["Marksman"], "head": "https://...", "abilityshow": ["10","70","40","10"] } },
+  "head": "https://...",
+  "head_big": "https://...",
+  "relation": {
+    "strong": { "target_hero_id": [49, 0, 0] },
+    "weak":   { "target_hero_id": [21, 0, 0] },
+    "assist": { "target_hero_id": [20, 0, 0] }
   }
 }
 ```
+`size=200` returns the entire roster in one call (currently ~132 heroes). `abilityshow` is `[durability, physical, magic, difficulty]` as strings. `relation` carries up to 3 target hero ids per bucket — that's our counter-graph source.
 
-### Important limitation
-Each hero's `counters` block lists **only one** best synergy, **one** hero they counter, and **one** hero that counters them. We build a richer graph by cross-referencing: if Hero A's API says "countered by B", we also record the inverse edge "B counters A". Across 124 heroes this produces a usable (still sparse) matchup graph.
+### `GET /api/heroes/{id}`
+Per-hero detail. We read `hero.data.name`, `hero.data.sortlabel` (role), `hero.data.abilityshow` (stats), `hero.data.heroskilllist[0].skilllist[]` (skills as `{skillname, skillicon, skilldesc, "skillcd&cost"}`), and `head` / `head_big` for portraits.
+
+### `GET /api/heroes/rank?size=200&rank={tier}&sort_field=win_rate&sort_order=desc`
+Leaderboard powering the popover's `rank_position` badge and the per-tile win/pick/ban rates. Each record exposes `main_heroid`, `main_hero_win_rate`, `main_hero_appearance_rate`, `main_hero_ban_rate`. Tiers: `all | epic | legend | mythic | honor | glory`.
+
+### `GET /api/heroes/{id}/counters?rank={tier}`
+First record's `data.sub_hero[]` = heroes this one counters, `data.sub_hero_last[]` = heroes that counter it. Each entry has `heroid`, `hero_win_rate`, `hero_appearance_rate`, `increase_win_rate`.
+
+### `GET /api/heroes/{id}/compatibility?rank={tier}`
+Same shape as `/counters`: `sub_hero[]` = compatible, `sub_hero_last[]` = not compatible.
+
+### `GET /api/heroes/{id}/relations`
+Moonton-curated synergy/counter triples (`assist` / `strong` / `weak`, up to 3 ids each). **Does not** accept the `rank` query param — these are rank-agnostic.
+
+### Synergy graph derivation
+The `relation` block on `/api/heroes` already gives strong/weak/assist with up to 3 ids per direction, so the scraper folds both directions of every edge into `counter_graph` directly — no inverse-inference fallback needed.
 
 ### CORS
-The MLBB API blocks browser origins. All calls must go through the backend proxy.
+The upstream blocks browser origins. All calls go through the FastAPI backend proxy.
 
 ---
 
@@ -241,8 +230,8 @@ Build strictly in this order. Do not start a phase until the previous one runs e
 ### Phase 1 — Scraper (~half day)
 Deliverable: `scraper/output/heroes.json` + `scraper/output/portraits/*.png`.
 
-1. `scrape.py` hits `/hero/list`, iterates all `heroid` values.
-2. For each hero: call `/hero/detail?id=X`, parse fields into the canonical schema above.
+1. `scrape.py` hits `/api/heroes?size=200`, iterates all `hero_id` values.
+2. For each hero: call `/api/heroes/{id}`, parse fields into the canonical schema above.
 3. Rate-limit: `time.sleep(1)` between detail calls. Log progress.
 4. Download each hero's portrait from the `key` URL to `portraits/{heroid}.png`.
 5. After all heroes collected, build `counter_graph` by iterating every hero's `counter_edges` and emitting both directions.
