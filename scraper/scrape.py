@@ -7,9 +7,9 @@ One-shot ETL:
   4. Build counter_graph from relations     -> strong/weak/assist edges
   5. Atomic write heroes.json               -> source of truth for the backend
 
-The openmlbb API's /api/heroes list response includes each hero's curated
-`relation` block (strong/weak/assist) with up to 3 target hero ids each. That's
-richer than the single-edge mapi.mobilelegends.com endpoint we used before.
+The /api/heroes list response includes each hero's curated `relation` block
+(strong/weak/assist) with up to 3 target hero ids each — the source of the
+counter graph.
 
 Run:  python scrape.py
 Output:
@@ -121,7 +121,7 @@ def parse_stats(hero_data: dict) -> dict:
     """openmlbb `abilityshow` is [durability, physical, magic, difficulty] as strings.
 
     Confirmed against Miya (Marksman) → abilityshow=['10','70','40','10']:
-      durability=10 physical=70 magic=40 difficulty=10 — matches the legacy mapi fields.
+      durability=10 physical=70 magic=40 difficulty=10.
     """
     ab = hero_data.get("abilityshow") or []
     ab = [_safe_int(x) for x in ab] + [0] * 4
