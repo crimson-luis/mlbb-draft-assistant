@@ -16,16 +16,10 @@ const REASON_TONE = {
   fills_role: 'bg-slate-500/15 text-slate-300 ring-slate-500/30',
 }
 
-// Prioritize the most-impactful reasons first: positives (counters, synergy,
-// fills_role) outweigh negatives (countered_by). Within each side, higher
-// |points| comes first. Used to pick the 2 pills that fit on a compact card.
 function rankReasons(reasons) {
   return [...reasons].sort((a, b) => Math.abs(b.points || 0) - Math.abs(a.points || 0))
 }
 
-// The MLBB API only provides *one* tip per hero per direction. After folding
-// the graph bidirectionally, a reason edge may have its original tip stored on
-// either end — check both.
 function findTip(rec, reason, heroesById) {
   const recHero = heroesById?.[rec.hero_id]
   if (!recHero) return null
@@ -47,7 +41,7 @@ function findTip(rec, reason, heroesById) {
            : tce.best_with?.id === rec.hero_id ? tce.best_with.tips
            : null
     case 'fills_role':
-      return `Your team has no ${reason.target_name} yet — this hero rounds out the composition.`
+      return `Your team has no ${reason.target_name} yet - this hero rounds out the composition.`
     default:
       return null
   }
@@ -128,7 +122,7 @@ export default function Recommendations({ recommendations, heroesById, loading, 
             filtered to my pool
           </span>
         )}
-        {loading && <span className="text-[10px] text-slate-500">scoring…</span>}
+        {loading && <span className="text-[10px] text-slate-500">scoring...</span>}
         {!hasInput && !loading && !error && (
           <span className="ml-2 text-[10px] text-slate-500">Pick someone to see suggestions.</span>
         )}

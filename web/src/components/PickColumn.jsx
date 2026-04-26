@@ -6,6 +6,31 @@ const TEAM_META = {
   enemy: { label: 'Red team',  title: 'text-rose-300' },
 }
 
+function powerTone(score) {
+  if (score == null) return 'bg-slate-800/80 text-slate-400 ring-slate-700'
+  if (score >= 75) return 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/30'
+  if (score >= 55) return 'bg-sky-500/15 text-sky-300 ring-sky-500/30'
+  if (score >= 40) return 'bg-amber-500/15 text-amber-300 ring-amber-500/30'
+  return 'bg-rose-500/15 text-rose-300 ring-rose-500/30'
+}
+
+function DraftPowerChip({ draftPower }) {
+  const score = draftPower?.score
+  const label = score == null ? '--' : String(score)
+  const title = score == null
+    ? 'Draft Power: pick heroes to evaluate this team.'
+    : `Draft Power: ${score}/${draftPower.maxScore}\n${draftPower.summary}`
+
+  return (
+    <span
+      title={title}
+      className={`ml-1 inline-flex h-5 min-w-8 items-center justify-center rounded px-1.5 text-[10px] font-bold tracking-normal tabular-nums ring-1 ring-inset ${powerTone(score)}`}
+    >
+      {label}
+    </span>
+  )
+}
+
 // Wide pick column. The section has no outer padding/border so its content
 // sits flush against the screen edge — PickRow handles internal layout, with
 // the player label anchored at the screen edge and the portrait fading toward
@@ -20,6 +45,7 @@ export default function PickColumn({
   onHeroLeave,
   leaderboardStats,
   rankTotal,
+  draftPower,
 }) {
   const meta = TEAM_META[team]
   const isAlly = team === 'ally'
@@ -29,7 +55,8 @@ export default function PickColumn({
   return (
     <section className={`flex min-h-0 flex-col px-2 lg:self-start lg:px-3 ${sectionOrder}`}>
       <h2 className={`flex h-6 items-center text-[10px] font-semibold uppercase tracking-widest ${meta.title} ${headerEdge}`}>
-        {meta.label}
+        <span>{meta.label}</span>
+        <DraftPowerChip draftPower={draftPower} />
       </h2>
       <div className="grid grid-cols-5 gap-px overflow-hidden rounded border border-slate-800 bg-slate-950/40 lg:flex lg:flex-col lg:gap-0 lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent">
         {Array.from({ length: PICK_SLOTS }).map((_, i) => {
