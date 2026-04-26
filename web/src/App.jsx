@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from './api'
 import { useDraftState } from './hooks/useDraftState'
+import useDraftPowerStats from './hooks/useDraftPowerStats'
 import useHeroPopover from './hooks/useHeroPopover'
 import useLeaderboard from './hooks/useLeaderboard'
 import BanBar from './components/BanBar'
@@ -140,7 +141,14 @@ export default function App() {
 
   const { state, actions, usedIds, recommendPayload, selectingSlot } = useDraftState()
   const { hover: popHover, onHeroEnter, onHeroLeave, onPopoverKeep } = useHeroPopover()
-  const { statsByHeroId, rankTotal } = useLeaderboard(rank)
+  const {
+    statsByHeroId,
+    rankTotal,
+    statsAvailable,
+    source: leaderboardSource,
+    sourceError: leaderboardError,
+    stale: leaderboardStale,
+  } = useLeaderboard(rank)
 
   // Resolve the effective ban count: user override wins, otherwise follow rank.
   const banCount = typeof banCountPref === 'number' ? banCountPref : RANK_BAN_DEFAULTS[rank] ?? 5
@@ -212,22 +220,40 @@ export default function App() {
     [data],
   )
 
+  const draftPickIds = useMemo(
+    () => [...state.ally.picks, ...state.enemy.picks].filter((id) => id != null).map(Number),
+    [state.ally.picks, state.enemy.picks],
+  )
+
+  const draftPowerStatsByHeroId = useDraftPowerStats({
+    pickedIds: draftPickIds,
+    leaderboardStats: statsByHeroId,
+    rank,
+  })
+
+  const leaderboardStatus = useMemo(() => ({
+    statsAvailable,
+    source: leaderboardSource,
+    error: leaderboardError,
+    stale: leaderboardStale,
+  }), [statsAvailable, leaderboardSource, leaderboardError, leaderboardStale])
+
   const draftPowers = useMemo(() => ({
     ally: getDraftPower({
       picks: state.ally.picks,
       heroesById,
-      statsByHeroId,
+      statsByHeroId: draftPowerStatsByHeroId,
       rankTotal,
       synergyPairs,
     }),
     enemy: getDraftPower({
       picks: state.enemy.picks,
       heroesById,
-      statsByHeroId,
+      statsByHeroId: draftPowerStatsByHeroId,
       rankTotal,
       synergyPairs,
     }),
-  }), [state.ally.picks, state.enemy.picks, heroesById, statsByHeroId, rankTotal, synergyPairs])
+  }), [state.ally.picks, state.enemy.picks, heroesById, draftPowerStatsByHeroId, rankTotal, synergyPairs])
 
   // Respect the active ban count — bans beyond the visible slots shouldn't
   // influence scoring or mark heroes as used.
@@ -511,7 +537,7 @@ export default function App() {
                   leaderboardStats={statsByHeroId}
                   rankTotal={rankTotal}
                 />
-                <DraftPower draftPowers={draftPowers} />
+                <DraftPower draftPowers={draftPowers} leaderboardStatus={leaderboardStatus} />
               </div>
             </section>
             <PickColumn

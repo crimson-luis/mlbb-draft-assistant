@@ -6,11 +6,19 @@ import { api } from '../api'
 // of a rank switch is one round-trip. Returns { statsByHeroId, loading, error }
 // — consumers render a small overlay per tile (rank badge + WR bar).
 export default function useLeaderboard(rank) {
-  const [data, setData] = useState({ statsByHeroId: {}, rankTotal: 0, loading: true, error: null })
+  const [data, setData] = useState({
+    statsByHeroId: {},
+    rankTotal: 0,
+    loading: true,
+    error: null,
+    statsAvailable: null,
+    source: null,
+    sourceError: null,
+    stale: false,
+  })
 
   useEffect(() => {
     let cancelled = false
-    setData((d) => ({ ...d, loading: true, error: null }))
 
     api.leaderboard({ rank })
       .then((resp) => {
@@ -23,13 +31,26 @@ export default function useLeaderboard(rank) {
         setData({
           statsByHeroId: stats,
           rankTotal: resp.rank_total ?? 0,
+          statsAvailable: resp.stats_available ?? Object.keys(stats).length > 0,
+          source: resp.source ?? null,
+          sourceError: resp.error ?? null,
+          stale: Boolean(resp.stale),
           loading: false,
-          error: null,
+          error: resp.stats_available === false ? (resp.error ?? 'Live leaderboard unavailable') : null,
         })
       })
       .catch((e) => {
         if (cancelled) return
-        setData({ statsByHeroId: {}, rankTotal: 0, loading: false, error: e.message })
+        setData({
+          statsByHeroId: {},
+          rankTotal: 0,
+          loading: false,
+          error: e.message,
+          statsAvailable: false,
+          source: null,
+          sourceError: e.message,
+          stale: false,
+        })
       })
 
     return () => { cancelled = true }

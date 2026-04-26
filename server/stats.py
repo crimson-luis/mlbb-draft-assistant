@@ -28,25 +28,51 @@ log = logging.getLogger("stats")
 STATS_BASE = os.environ.get(
     "MLBB_STATS_BASE", "https://openmlbb.fastapicloud.dev"
 ).rstrip("/")
+DEFAULT_STATS_BASES = [
+    "https://openmlbb.fastapicloud.dev",
+    "https://mlbb.rone.dev/api",
+]
 CACHE_TTL = 60 * 60  # 1 hour
+RANK_FAILURE_TTL = 60
 UPSTREAM_TIMEOUT = 8.0
 
 VALID_RANKS = {"all", "epic", "legend", "mythic", "honor", "glory"}
 DEFAULT_RANK = "mythic"
 
-# Leaderboard cache: full 132-hero ranked list keyed by rank tier, refreshed every
-# CACHE_TTL. Entry shape: (timestamp, {hero_id: {rank, win_rate, pick_rate, ban_rate}},
-# total, data_updated_at_ms). Used for both the popover's rank_position badge and the
-# bulk /api/leaderboard endpoint that powers per-tile overlays.
-_rank_cache: dict[str, tuple[float, dict[int, dict], int, int | None]] = {}
+# Leaderboard cache: full ranked list keyed by rank tier, refreshed every
+# CACHE_TTL. Degraded/failed refreshes use RANK_FAILURE_TTL so a transient upstream
+# outage does not poison Draft Power and tile overlays for a full hour.
+_rank_cache: dict[str, dict[str, Any]] = {}
 _cache: dict[tuple[int, str], tuple[float, dict]] = {}
 _pool = ThreadPoolExecutor(max_workers=8, thread_name_prefix="stats")
 
 
-def _get(path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
-    r = requests.get(f"{STATS_BASE}{path}", params=params or {}, timeout=UPSTREAM_TIMEOUT)
+def _stats_bases() -> list[str]:
+    bases: list[str] = []
+    for base in [STATS_BASE, *DEFAULT_STATS_BASES]:
+        base = base.rstrip("/")
+        if base not in bases:
+            bases.append(base)
+    return bases
+
+
+STATS_BASES = _stats_bases()
+
+
+def _source_url(base: str, path: str) -> str:
+    if base.endswith("/api") and path.startswith("/api/"):
+        return f"{base}{path.removeprefix('/api')}"
+    return f"{base}{path}"
+
+
+def _get_from_base(base: str, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    r = requests.get(_source_url(base, path), params=params or {}, timeout=UPSTREAM_TIMEOUT)
     r.raise_for_status()
     return r.json()
+
+
+def _get(path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    return _get_from_base(STATS_BASE, path, params)
 
 
 def _first_record(payload: dict) -> tuple[dict, int | None]:
@@ -86,26 +112,7 @@ def _top_subs(record: dict, key: str, hero_names: dict[int, str], limit: int = 5
     return out
 
 
-def _fetch_leaderboard(rank: str) -> tuple[dict[int, dict], int, int | None]:
-    """Fetch `/api/heroes/rank?size=200&rank=<tier>` sorted by win rate.
-
-    Returns ({hero_id: {rank, win_rate, pick_rate, ban_rate}}, total, updated_at_ms).
-    On upstream failure returns ({}, 0, None) so callers can fail-open.
-    """
-    now = time.time()
-    hit = _rank_cache.get(rank)
-    if hit and now - hit[0] < CACHE_TTL:
-        return hit[1], hit[2], hit[3]
-    try:
-        payload = _get(
-            "/api/heroes/rank",
-            {"size": 200, "rank": rank, "sort_field": "win_rate", "sort_order": "desc"},
-        )
-    except requests.RequestException as e:
-        log.warning("leaderboard fetch failed (rank=%s): %s", rank, e)
-        empty: dict[int, dict] = {}
-        _rank_cache[rank] = (now, empty, 0, None)
-        return empty, 0, None
+def _parse_leaderboard(payload: dict) -> tuple[dict[int, dict], int, int | None]:
     records = (payload.get("data") or {}).get("records") or []
     entries: dict[int, dict] = {}
     updated_candidates: list[int] = []
@@ -126,29 +133,103 @@ def _fetch_leaderboard(rank: str) -> tuple[dict[int, dict], int, int | None]:
                 updated_candidates.append(int(updated))
         except (TypeError, ValueError):
             pass
-    total = len(records)
     updated_at_ms = max(updated_candidates) if updated_candidates else None
-    _rank_cache[rank] = (now, entries, total, updated_at_ms)
-    return entries, total, updated_at_ms
+    return entries, len(records), updated_at_ms
+
+
+def _rank_result(
+    *,
+    entries: dict[int, dict] | None = None,
+    total: int = 0,
+    updated_at_ms: int | None = None,
+    source: str | None = None,
+    stats_available: bool = False,
+    error: str | None = None,
+    stale: bool = False,
+    ttl: int = CACHE_TTL,
+) -> dict[str, Any]:
+    return {
+        "cached_at": time.time(),
+        "ttl": ttl,
+        "entries": entries or {},
+        "total": total,
+        "updated_at_ms": updated_at_ms,
+        "source": source,
+        "stats_available": stats_available,
+        "error": error,
+        "stale": stale,
+    }
+
+
+def _fetch_leaderboard(rank: str) -> dict[str, Any]:
+    """Fetch `/api/heroes/rank?size=200&rank=<tier>` sorted by win rate.
+
+    Returns a status dict carrying entries, source, and availability metadata.
+    On upstream failure, reuses a previous non-empty cache if one exists; otherwise
+    caches a short-lived degraded response so callers can fail open without hiding
+    the outage for an hour.
+    """
+    now = time.time()
+    hit = _rank_cache.get(rank)
+    if hit and now - hit["cached_at"] < hit.get("ttl", CACHE_TTL):
+        return hit
+
+    params = {"size": 200, "rank": rank, "sort_field": "win_rate", "sort_order": "desc"}
+    errors: list[str] = []
+    for base in STATS_BASES:
+        try:
+            payload = _get_from_base(base, "/api/heroes/rank", params)
+            entries, total, updated_at_ms = _parse_leaderboard(payload)
+            if not entries:
+                errors.append(f"{base}: empty leaderboard response")
+                continue
+            result = _rank_result(
+                entries=entries,
+                total=total,
+                updated_at_ms=updated_at_ms,
+                source=base,
+                stats_available=True,
+            )
+            _rank_cache[rank] = result
+            return result
+        except requests.RequestException as e:
+            log.warning("leaderboard fetch failed (rank=%s, source=%s): %s", rank, base, e)
+            errors.append(f"{base}: {e}")
+
+    error = "; ".join(errors) if errors else "leaderboard unavailable"
+    if hit and hit.get("entries"):
+        result = {**hit, "cached_at": now, "ttl": RANK_FAILURE_TTL, "stale": True, "error": error}
+        _rank_cache[rank] = result
+        return result
+
+    result = _rank_result(error=error, ttl=RANK_FAILURE_TTL)
+    _rank_cache[rank] = result
+    return result
 
 
 def _get_rank_index(rank: str) -> tuple[dict[int, int], int]:
     """Thin projection over _fetch_leaderboard: (hero_id -> rank position, total)."""
-    entries, total, _ = _fetch_leaderboard(rank)
+    result = _fetch_leaderboard(rank)
+    entries = result["entries"]
+    total = result["total"]
     return {hid: e["rank"] for hid, e in entries.items()}, total
 
 
 def fetch_leaderboard(rank: str = DEFAULT_RANK) -> dict:
     """Public wrapper shaped for the /api/leaderboard endpoint."""
     rank = rank if rank in VALID_RANKS else DEFAULT_RANK
-    entries, total, updated_at_ms = _fetch_leaderboard(rank)
+    result = _fetch_leaderboard(rank)
+    entries = result["entries"]
     return {
         "rank_tier": rank,
-        "rank_total": total,
+        "rank_total": result["total"],
         "heroes": {str(hid): e for hid, e in entries.items()},
-        "data_updated_at_ms": updated_at_ms,
+        "stats_available": result["stats_available"],
+        "stale": result["stale"],
+        "error": result["error"],
+        "data_updated_at_ms": result["updated_at_ms"],
         "fetched_at": time.time(),
-        "source": STATS_BASE,
+        "source": result["source"],
     }
 
 

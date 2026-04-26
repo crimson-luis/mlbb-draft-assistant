@@ -217,7 +217,7 @@ function teamMetrics(ids, heroes, statsByHeroId, rankTotal) {
     .filter(Boolean)
   const winRates = rows.map((row) => normalizeWinRate(row.win_rate)).filter((v) => v != null)
   const ranks = rows
-    .map((row) => Number(row.rank))
+    .map((row) => Number(row.rank ?? row.rank_position))
     .filter((rank) => Number.isFinite(rank))
   const total = Number(rankTotal) || 0
   const rankPercentiles = ranks
@@ -234,7 +234,9 @@ function teamMetrics(ids, heroes, statsByHeroId, rankTotal) {
     avgWinRate: winRates.length
       ? winRates.reduce((sum, wr) => sum + wr, 0) / winRates.length
       : null,
+    winRateCount: winRates.length,
     avgRank: ranks.length ? ranks.reduce((sum, rank) => sum + rank, 0) / ranks.length : null,
+    rankCount: ranks.length,
     avgRankPercentile: rankPercentiles.length
       ? rankPercentiles.reduce((sum, v) => sum + v, 0) / rankPercentiles.length
       : null,
@@ -243,7 +245,7 @@ function teamMetrics(ids, heroes, statsByHeroId, rankTotal) {
 }
 
 function metaForm(metrics) {
-  if (metrics.statsCount === 0) {
+  if (metrics.winRateCount === 0 && metrics.rankCount === 0) {
     return {
       points: 0,
       detail: 'Live stats unavailable',
@@ -256,7 +258,7 @@ function metaForm(metrics) {
 
   return {
     points,
-    detail: `${wrText}; ${metrics.statsCount}/${metrics.pickCount} ranked`,
+    detail: `${wrText}; ${metrics.winRateCount}/${metrics.pickCount} WR, ${metrics.rankCount}/${metrics.pickCount} ranked`,
   }
 }
 
