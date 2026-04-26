@@ -35,10 +35,24 @@ function formatRank(value) {
   return `#${value.toFixed(value % 1 === 0 ? 0 : 1)}`
 }
 
-function metricItems(power) {
+function leaderboardIssue(leaderboardStatus) {
+  if (!leaderboardStatus) return ''
+  if (leaderboardStatus.statsAvailable === false) {
+    return ` Live leaderboard unavailable${leaderboardStatus.error ? `: ${leaderboardStatus.error}` : '.'}`
+  }
+  if (leaderboardStatus.stale) {
+    return ` Using stale leaderboard data because the latest refresh failed${leaderboardStatus.error ? `: ${leaderboardStatus.error}` : '.'}`
+  }
+  return ''
+}
+
+function metricItems(power, leaderboardStatus) {
   const m = power?.metrics ?? {}
   const pickCount = m.pickCount ?? 0
   const statCount = m.statsCount ?? 0
+  const winRateCount = m.winRateCount ?? statCount
+  const rankCount = m.rankCount ?? 0
+  const issue = leaderboardIssue(leaderboardStatus)
   return [
     {
       label: 'Phys',
@@ -51,14 +65,18 @@ function metricItems(power) {
       title: `Magic proportion = sum of picked heroes' magic stat divided by physical + magic stat total. Raw magic power: ${m.magicPower ?? 0}. Picks counted: ${pickCount}.`,
     },
     {
-      label: 'WR',
+      label: 'Avg. WR',
       value: formatPercent(m.avgWinRate, 1),
-      title: `Average win rate = arithmetic mean of live leaderboard win rates for picked heroes with rank data. Heroes with stats: ${statCount}/${pickCount}.`,
+      title: m.avgWinRate == null
+        ? `Average win rate needs live win-rate data for picked heroes. Heroes with WR data: ${winRateCount}/${pickCount}.${issue}`
+        : `Average win rate = arithmetic mean of live win rates for picked heroes. Heroes with WR data: ${winRateCount}/${pickCount}.${issue}`,
     },
     {
-      label: 'Rank',
+      label: 'Avg. Rank',
       value: formatRank(m.avgRank),
-      title: `Rank mean = arithmetic mean of live leaderboard rank positions for picked heroes. Lower is better. Heroes with stats: ${statCount}/${pickCount}.`,
+      title: m.avgRank == null
+        ? `Rank mean requires live leaderboard rank positions. Lower is better. Heroes with rank data: ${rankCount}/${pickCount}.${issue}`
+        : `Rank mean = arithmetic mean of live leaderboard rank positions for picked heroes. Lower is better. Heroes with rank data: ${rankCount}/${pickCount}.${issue}`,
     },
   ]
 }
@@ -75,7 +93,7 @@ function MetricPill({ item }) {
   )
 }
 
-function TeamPowerCard({ team, power }) {
+function TeamPowerCard({ team, power, leaderboardStatus }) {
   const meta = POWER_META[team]
   return (
     <div className={`min-w-0 rounded bg-slate-950/40 px-2 py-1 ring-1 ring-inset ${meta.ring}`}>
@@ -89,7 +107,7 @@ function TeamPowerCard({ team, power }) {
         {power?.summary ?? 'Pick heroes to evaluate draft power.'}
       </div>
       <div className="mt-1 grid grid-cols-2 gap-1">
-        {metricItems(power).map((item) => (
+        {metricItems(power, leaderboardStatus).map((item) => (
           <MetricPill key={item.label} item={item} />
         ))}
       </div>
@@ -107,7 +125,7 @@ function BreakdownValue({ row, team }) {
   )
 }
 
-export default function DraftPower({ draftPowers }) {
+export default function DraftPower({ draftPowers, leaderboardStatus }) {
   const ally = draftPowers?.ally
   const enemy = draftPowers?.enemy
   const rows = ally?.breakdown?.length ? ally.breakdown : enemy?.breakdown ?? []
@@ -120,8 +138,8 @@ export default function DraftPower({ draftPowers }) {
       </header>
 
       <div className="grid grid-cols-2 gap-1.5">
-        <TeamPowerCard team="ally" power={ally} />
-        <TeamPowerCard team="enemy" power={enemy} />
+        <TeamPowerCard team="ally" power={ally} leaderboardStatus={leaderboardStatus} />
+        <TeamPowerCard team="enemy" power={enemy} leaderboardStatus={leaderboardStatus} />
       </div>
 
       <div className="min-h-0 overflow-y-auto pr-1">

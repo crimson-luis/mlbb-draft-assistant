@@ -14,7 +14,7 @@ function powerTone(score) {
   return 'bg-rose-500/15 text-rose-300 ring-rose-500/30'
 }
 
-function DraftPowerChip({ draftPower }) {
+function DraftPowerChip({ draftPower, className = '' }) {
   const score = draftPower?.score
   const label = score == null ? '--' : String(score)
   const title = score == null
@@ -24,7 +24,7 @@ function DraftPowerChip({ draftPower }) {
   return (
     <span
       title={title}
-      className={`ml-1 inline-flex h-5 min-w-8 items-center justify-center rounded px-1.5 text-[10px] font-bold tracking-normal tabular-nums ring-1 ring-inset ${powerTone(score)}`}
+      className={`inline-flex h-5 min-w-8 items-center justify-center rounded px-1.5 text-[10px] font-bold tracking-normal tabular-nums ring-1 ring-inset ${powerTone(score)} ${className}`}
     >
       {label}
     </span>
@@ -55,8 +55,17 @@ export default function PickColumn({
   return (
     <section className={`flex min-h-0 flex-col px-2 lg:self-start lg:px-3 ${sectionOrder}`}>
       <h2 className={`flex h-6 items-center text-[10px] font-semibold uppercase tracking-widest ${meta.title} ${headerEdge}`}>
-        <span>{meta.label}</span>
-        <DraftPowerChip draftPower={draftPower} />
+        {isAlly ? (
+          <>
+            <span>{meta.label}</span>
+            <DraftPowerChip draftPower={draftPower} className="ml-1" />
+          </>
+        ) : (
+          <>
+            <DraftPowerChip draftPower={draftPower} className="mr-1" />
+            <span>{meta.label}</span>
+          </>
+        )}
       </h2>
       <div className="grid grid-cols-5 gap-px overflow-hidden rounded border border-slate-800 bg-slate-950/40 lg:flex lg:flex-col lg:gap-0 lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent">
         {Array.from({ length: PICK_SLOTS }).map((_, i) => {

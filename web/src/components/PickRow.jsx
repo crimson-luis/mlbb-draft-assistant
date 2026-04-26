@@ -37,8 +37,6 @@ export default function PickRow({
   // Info strip mirrors the team side: ally aligned to the left (screen) edge,
   // enemy to the right.
   const stripAlign = isAlly ? 'justify-start text-left' : 'justify-end text-right'
-  const stripFlow = isAlly ? '' : 'flex-row-reverse'
-
   const ringBase = dragOver
     ? 'ring-2 ring-inset ring-emerald-400'
     : 'hover:bg-slate-800/20'
@@ -109,14 +107,14 @@ export default function PickRow({
             the portrait pane, content hugs the screen-edge side. */}
         <div className={`pointer-events-none absolute inset-x-0 bottom-0 flex h-6 items-center bg-black/50 px-1.5 sm:px-2 lg:h-7 ${stripAlign}`}>
           {filled ? (
-            <div className={`flex min-w-0 items-center gap-1.5 ${stripFlow}`}>
+            <div className="flex min-w-0 items-center gap-1.5">
               {stats?.rank != null && (
                 <span className={`flex-none text-[11px] font-semibold tabular-nums ${rankTextTone(stats.rank, rankTotal)}`}>
                   #{stats.rank}
                 </span>
               )}
               <span className="min-w-0 truncate text-xs font-semibold text-slate-100 lg:text-sm">{hero.name}</span>
-              <span className={`flex flex-none items-center gap-1 text-[10px] tabular-nums text-slate-200 lg:text-[11px] ${stripFlow}`}>
+              <span className="flex flex-none items-center gap-1 text-[10px] tabular-nums text-slate-200 lg:text-[11px]">
                 <WrDot wr={stats?.win_rate} size="xs" />
                 {stats?.win_rate != null && <span>{Math.round(stats.win_rate * 100)}%</span>}
               </span>
