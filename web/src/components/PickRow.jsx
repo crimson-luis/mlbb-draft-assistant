@@ -26,10 +26,9 @@ export default function PickRow({
   const filled = !!hero
   const [dragOver, setDragOver] = useState(false)
 
-  // Full-body art is portrait-oriented; anchor the top of the image so faces
-  // stay visible in the 112px row. Horizontally we keep the hero on their team
-  // side so they don't drift toward the HeroPool.
-  const objectPos = isAlly ? 'left top' : 'right top'
+  // Full-body art is portrait-oriented. Keep its natural aspect ratio and
+  // anchor it to the team edge instead of stretching it across a wide lane.
+  const imageEdge = isAlly ? 'left-0' : 'right-0'
 
   // Subtle fade where the row meets the central HeroPool, so the image doesn't
   // clip with a hard edge.
@@ -81,21 +80,20 @@ export default function PickRow({
       type="button"
       {...handlers}
       aria-label={ariaLabel}
-      className={`relative block h-[112px] w-full cursor-pointer overflow-hidden ${pulseClass} ${ringBase} transition`}
+      className={`relative block h-[84px] w-full cursor-pointer overflow-hidden sm:h-[92px] lg:h-[112px] ${pulseClass} ${ringBase} transition`}
     >
       <div className="absolute inset-0 overflow-hidden">
-        {/* Portrait fills the pane; mask fades its inner edge toward HeroPool. */}
+        {/* Portrait keeps its aspect ratio; mask fades its inner edge toward HeroPool. */}
         {filled ? (
           <img
             src={api.portraitFullUrl(hero.id)}
             alt=""
             draggable={false}
             style={{
-              objectPosition: objectPos,
               WebkitMaskImage: maskImage,
               maskImage,
             }}
-            className="absolute inset-0 h-full w-full object-cover"
+            className={`absolute top-0 ${imageEdge} h-full w-auto max-w-none object-contain`}
           />
         ) : (
           <div className={`flex h-full items-center ${isAlly ? 'justify-start pl-4' : 'justify-end pr-4'} text-2xl text-slate-700`}>
@@ -105,7 +103,7 @@ export default function PickRow({
 
         {/* Bottom info strip — translucent black bar pinned to the bottom of
             the portrait pane, content hugs the screen-edge side. */}
-        <div className={`pointer-events-none absolute inset-x-0 bottom-0 flex h-7 items-center bg-black/50 px-2 ${stripAlign}`}>
+        <div className={`pointer-events-none absolute inset-x-0 bottom-0 flex h-6 items-center bg-black/50 px-1.5 sm:px-2 lg:h-7 ${stripAlign}`}>
           {filled ? (
             <div className={`flex min-w-0 items-center gap-1.5 ${stripFlow}`}>
               {stats?.rank != null && (
@@ -113,8 +111,8 @@ export default function PickRow({
                   #{stats.rank}
                 </span>
               )}
-              <span className="min-w-0 truncate text-sm font-semibold text-slate-100">{hero.name}</span>
-              <span className={`flex flex-none items-center gap-1 text-[11px] tabular-nums text-slate-200 ${stripFlow}`}>
+              <span className="min-w-0 truncate text-xs font-semibold text-slate-100 lg:text-sm">{hero.name}</span>
+              <span className={`flex flex-none items-center gap-1 text-[10px] tabular-nums text-slate-200 lg:text-[11px] ${stripFlow}`}>
                 <WrDot wr={stats?.win_rate} size="xs" />
                 {stats?.win_rate != null && <span>{Math.round(stats.win_rate * 100)}%</span>}
               </span>

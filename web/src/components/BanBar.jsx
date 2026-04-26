@@ -12,12 +12,12 @@ function BanGroup({ team, state, heroesById, selectingSlot, actions, banCount, o
   const meta = TEAM_STYLES[team]
   const count = Math.max(0, Math.min(5, banCount))
   return (
-    <div className={`flex min-w-0 flex-1 items-center gap-1 ${meta.justify}`}>
+    <div className={`flex min-w-0 flex-1 items-center gap-0.5 sm:gap-1 ${meta.justify}`}>
       {Array.from({ length: count }).map((_, i) => {
         const id = state[team].bans[i] ?? null
         const hero = id != null ? heroesById[id] : null
         return (
-          <div key={`${team}-ban-${i}`} className={`h-[52px] w-[52px] rounded-full ring-1 ${meta.ringTone}`}>
+          <div key={`${team}-ban-${i}`} className={`h-9 w-9 rounded-full ring-1 sm:h-11 sm:w-11 lg:h-[52px] lg:w-[52px] ${meta.ringTone}`}>
             <HeroSlot
               hero={hero}
               kind="bans"
@@ -50,7 +50,7 @@ export default function BanBar({
   rankTotal,
 }) {
   return (
-    <section className="flex h-14 items-center justify-between gap-3 border-b border-slate-800 bg-slate-900/40 px-3">
+    <section className="flex h-14 items-center justify-between gap-1 border-b border-slate-800 bg-slate-900/40 px-1 sm:gap-3 sm:px-3">
       <BanGroup
         team="ally"
         state={state}

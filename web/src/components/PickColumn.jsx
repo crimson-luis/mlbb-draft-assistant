@@ -23,14 +23,15 @@ export default function PickColumn({
 }) {
   const meta = TEAM_META[team]
   const isAlly = team === 'ally'
-  const headerEdge = isAlly ? 'justify-start' : 'justify-end'
+  const headerEdge = isAlly ? 'justify-start' : 'justify-start lg:justify-end'
+  const sectionOrder = isAlly ? 'order-1 lg:order-none' : 'order-2 lg:order-none'
 
   return (
-    <section className="flex flex-col self-start px-3">
+    <section className={`flex min-h-0 flex-col px-2 lg:self-start lg:px-3 ${sectionOrder}`}>
       <h2 className={`flex h-6 items-center text-[10px] font-semibold uppercase tracking-widest ${meta.title} ${headerEdge}`}>
         {meta.label}
       </h2>
-      <div className="flex flex-col">
+      <div className="grid grid-cols-5 gap-px overflow-hidden rounded border border-slate-800 bg-slate-950/40 lg:flex lg:flex-col lg:gap-0 lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent">
         {Array.from({ length: PICK_SLOTS }).map((_, i) => {
           const id = state[team].picks[i] ?? null
           const hero = id != null ? heroesById[id] : null

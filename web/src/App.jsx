@@ -301,14 +301,14 @@ export default function App() {
   return (
     <div className="grid h-screen grid-rows-[auto_56px_minmax(0,1fr)] overflow-hidden">
       <header className="border-b border-slate-800 bg-slate-900/60 backdrop-blur">
-        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-3 px-6 py-2">
+        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-2 px-3 py-2 sm:gap-3 sm:px-6">
           <h1 className="text-lg font-semibold tracking-tight">MLBB Draft Assistant</h1>
           {data && (
             <span className="text-xs text-slate-400">
               {Object.keys(data.heroes).length} heroes · v{data.version}
             </span>
           )}
-          <div className="ml-auto flex flex-wrap items-center gap-2">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
             <label className="flex items-center gap-1 text-xs text-slate-400" title="Rank tier used for live stats">
               Rank
               <select
@@ -411,9 +411,9 @@ export default function App() {
         )}
       </div>
 
-      <main className="grid min-h-0 grid-cols-[minmax(0,1fr)_minmax(0,1200px)_minmax(0,1fr)] py-2">
+      <main className="grid min-h-0 grid-cols-1 gap-2 overflow-y-auto px-2 py-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1200px)_minmax(0,1fr)] lg:gap-0 lg:overflow-hidden lg:px-0">
         {error && (
-          <div className="col-span-3 flex items-center justify-center">
+          <div className="flex items-center justify-center lg:col-span-3">
             <div className="rounded border border-rose-700 bg-rose-950/50 p-4 text-sm text-rose-200">
               Failed to load hero data: {error}
               <div className="mt-1 text-xs text-rose-300">
@@ -424,7 +424,7 @@ export default function App() {
         )}
 
         {!data && !error && (
-          <div className="col-span-3 flex items-center justify-center text-sm text-slate-400">
+          <div className="flex items-center justify-center text-sm text-slate-400 lg:col-span-3">
             Loading hero roster…
           </div>
         )}
@@ -443,7 +443,7 @@ export default function App() {
               rankTotal={rankTotal}
             />
             <section
-              className="grid w-full min-h-0 min-w-0 px-2"
+              className="order-3 grid min-h-[520px] w-full min-w-0 px-0 lg:order-none lg:min-h-0 lg:px-2"
               style={{ gridTemplateRows: `minmax(0,1fr) 8px ${recsH}px` }}
             >
               <HeroPool

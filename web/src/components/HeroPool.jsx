@@ -161,7 +161,7 @@ export default function HeroPool({
 
   return (
     <section className="flex min-h-0 flex-col gap-2 rounded-lg border border-slate-800 bg-slate-900/40 p-2">
-      <header className="flex flex-wrap items-center gap-2">
+      <header className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="inline-flex overflow-hidden rounded ring-1 ring-slate-700">
           {['lane', 'role'].map((m) => (
             <button
@@ -209,7 +209,7 @@ export default function HeroPool({
               ))}
         </div>
         <span className="text-xs text-slate-500">{list.length} shown</span>
-        <div className="ml-auto flex items-center gap-1">
+        <div className="flex w-full flex-wrap items-center gap-1 sm:ml-auto sm:w-auto">
           <label className="flex items-center gap-1 text-xs text-slate-400">
             <span>Sort</span>
             <select
@@ -236,7 +236,7 @@ export default function HeroPool({
             placeholder="Search heroes…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-sm placeholder-slate-500 focus:border-slate-400 focus:outline-none"
+            className="min-w-[160px] flex-1 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-sm placeholder-slate-500 focus:border-slate-400 focus:outline-none sm:w-[180px] sm:flex-none"
           />
         </div>
       </header>
@@ -247,7 +247,7 @@ export default function HeroPool({
         </div>
       )}
 
-      <div className="grid min-h-0 flex-1 grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-1 overflow-y-auto overflow-x-hidden pr-1 [grid-auto-rows:112px]">
+      <div className="grid min-h-0 flex-1 grid-cols-[repeat(auto-fill,minmax(64px,1fr))] gap-1 overflow-y-auto overflow-x-hidden pr-1 [grid-auto-rows:96px] sm:grid-cols-[repeat(auto-fill,minmax(72px,1fr))] sm:[grid-auto-rows:104px] lg:grid-cols-[repeat(auto-fill,minmax(80px,1fr))] lg:[grid-auto-rows:112px]">
         {list.map((h) => {
           const used = usedIds.has(h.id)
           const owned = ownedIds?.has(h.id)
@@ -269,14 +269,14 @@ export default function HeroPool({
               onMouseEnter={(e) => onHeroEnter?.(h.id, e.currentTarget)}
               onMouseLeave={() => onHeroLeave?.()}
               onClick={() => handleClick(h)}
-              className={`group relative flex h-[112px] flex-col items-center justify-center gap-0.5 rounded-md p-0.5 text-left transition
+              className={`group relative flex h-24 flex-col items-center justify-center gap-0.5 rounded-md p-0.5 text-left transition sm:h-[104px] lg:h-[112px]
                 ${!editMode && used ? 'cursor-not-allowed opacity-30' : ''}
                 ${interactive ? 'cursor-pointer hover:bg-slate-800/70' : draggable ? 'cursor-grab hover:bg-slate-800/70 active:cursor-grabbing' : 'cursor-not-allowed'}
               `}
               aria-label={`${h.name} (${h.role})`}
               title={!editMode && used ? `${h.name} — already used` : h.name}
             >
-              <div className={`relative h-[72px] w-[72px] flex-none overflow-hidden rounded-full bg-slate-800 ring-1 ${
+              <div className={`relative h-14 w-14 flex-none overflow-hidden rounded-full bg-slate-800 ring-1 sm:h-16 sm:w-16 lg:h-[72px] lg:w-[72px] ${
                 editMode && owned ? 'ring-amber-400' : 'ring-slate-700 group-hover:ring-slate-400'
               }`}>
                 <img
@@ -294,7 +294,7 @@ export default function HeroPool({
                   </span>
                 )}
               </div>
-              <span className="flex w-full items-center justify-center gap-1 truncate text-center text-[10px] font-medium leading-none text-slate-100" title={h.name}>
+              <span className="flex w-full items-center justify-center gap-1 truncate text-center text-[9px] font-medium leading-none text-slate-100 sm:text-[10px]" title={h.name}>
                 {stats?.rank ? (
                   <span className={`flex-none tabular-nums ${rankTextTone(stats.rank, rankTotal)}`}>#{stats.rank}</span>
                 ) : null}
