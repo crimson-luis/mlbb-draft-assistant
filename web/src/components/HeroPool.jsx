@@ -94,6 +94,51 @@ function loadSort() {
   }
 }
 
+function MyPoolPopover({
+  ownedCount,
+  editMode,
+  filterToOwned,
+  onEditModeChange,
+  onFilterToOwnedChange,
+}) {
+  return (
+    <div className="absolute right-0 top-[calc(100%+0.4rem)] z-40 w-[calc(100vw-2rem)] max-w-72 rounded-lg border border-slate-700 bg-slate-950 p-3 shadow-2xl shadow-black/40 sm:w-72">
+      <div className="grid gap-2">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">My Pool</span>
+          <span className="text-xs font-semibold text-slate-200">{ownedCount} heroes</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => onEditModeChange((value) => !value)}
+          className={`min-h-9 rounded-md px-2.5 py-1 text-left text-sm font-medium transition ${
+            editMode
+              ? 'bg-amber-400 text-slate-950 hover:bg-amber-300'
+              : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+          }`}
+        >
+          {editMode ? 'Done editing' : 'Edit pool'}
+        </button>
+        <label
+          className={`flex min-h-9 items-center gap-2 rounded-md bg-slate-900 px-2.5 py-1 text-sm text-slate-200 ring-1 ring-inset ring-slate-800 ${
+            ownedCount === 0 ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-slate-800'
+          }`}
+          title={ownedCount === 0 ? 'Add heroes to your pool first' : 'Only suggest heroes you own'}
+        >
+          <input
+            type="checkbox"
+            checked={filterToOwned}
+            disabled={ownedCount === 0}
+            onChange={(e) => onFilterToOwnedChange(e.target.checked)}
+            className="h-3.5 w-3.5 accent-amber-400"
+          />
+          Only recommend my pool
+        </label>
+      </div>
+    </div>
+  )
+}
+
 export default function HeroPool({
   heroes,
   usedIds,
@@ -101,6 +146,9 @@ export default function HeroPool({
   onPick,
   editMode,
   ownedIds,
+  filterToOwned,
+  onEditModeChange,
+  onFilterToOwnedChange,
   onToggleOwned,
   onHeroEnter,
   onHeroLeave,
@@ -115,7 +163,9 @@ export default function HeroPool({
   const [filterMode, setFilterMode] = useState(loadFilterMode)
   const [sort, setSort] = useState(loadSort)
   const [dragState, setDragState] = useState(null)
+  const [poolMenuOpen, setPoolMenuOpen] = useState(false)
   const poolRef = useRef(null)
+  const poolMenuRef = useRef(null)
   const pendingDragRef = useRef(null)
   const removePointerListenersRef = useRef(null)
   const suppressClickRef = useRef(false)
@@ -131,6 +181,22 @@ export default function HeroPool({
       // ignore quota / disabled storage
     }
   }, [sort])
+
+  useEffect(() => {
+    if (!poolMenuOpen) return undefined
+    const onPointerDown = (e) => {
+      if (!poolMenuRef.current?.contains(e.target)) setPoolMenuOpen(false)
+    }
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') setPoolMenuOpen(false)
+    }
+    window.addEventListener('pointerdown', onPointerDown)
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown)
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [poolMenuOpen])
 
   const setSortField = (field) => {
     setSort((prev) => {
@@ -432,6 +498,29 @@ export default function HeroPool({
         </div>
         <span className="text-xs text-slate-500">{list.length} shown</span>
         <div className="flex w-full flex-wrap items-center gap-1 sm:ml-auto sm:w-auto">
+          <div ref={poolMenuRef} className="relative">
+            <button
+              type="button"
+              aria-expanded={poolMenuOpen}
+              onClick={() => setPoolMenuOpen((value) => !value)}
+              className={`rounded-md border px-2 py-1 text-xs font-medium transition ${
+                editMode || filterToOwned
+                  ? 'border-amber-400/50 bg-amber-400/10 text-amber-200 hover:bg-amber-400/15'
+                  : 'border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700'
+              }`}
+            >
+              My Pool <span className="tabular-nums text-slate-400">{ownedIds?.size ?? 0}</span>
+            </button>
+            {poolMenuOpen && (
+              <MyPoolPopover
+                ownedCount={ownedIds?.size ?? 0}
+                editMode={editMode}
+                filterToOwned={filterToOwned}
+                onEditModeChange={onEditModeChange}
+                onFilterToOwnedChange={onFilterToOwnedChange}
+              />
+            )}
+          </div>
           <label className="flex items-center gap-1 text-xs text-slate-400">
             <span>Sort</span>
             <select

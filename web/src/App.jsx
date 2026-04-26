@@ -5,6 +5,8 @@ import useDraftPowerStats from './hooks/useDraftPowerStats'
 import useHeroPopover from './hooks/useHeroPopover'
 import useLeaderboard from './hooks/useLeaderboard'
 import BanBar from './components/BanBar'
+import FooterBar from './components/FooterBar'
+import HeaderBar from './components/HeaderBar'
 import PickColumn from './components/PickColumn'
 import HeroPool from './components/HeroPool'
 import Recommendations from './components/Recommendations'
@@ -360,99 +362,20 @@ export default function App() {
   }, [actions])
 
   return (
-    <div className="grid h-screen grid-rows-[auto_56px_minmax(0,1fr)] overflow-hidden">
-      <header className="border-b border-slate-800 bg-slate-900/60 backdrop-blur">
-        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-2 px-3 py-2 sm:gap-3 sm:px-6">
-          <h1 className="text-lg font-semibold tracking-tight">MLBB Draft Assistant</h1>
-          {data && (
-            <span className="text-xs text-slate-400">
-              {Object.keys(data.heroes).length} heroes · v{data.version}
-            </span>
-          )}
-          <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
-            <label className="flex items-center gap-1 text-xs text-slate-400" title="Rank tier used for live stats">
-              Rank
-              <select
-                value={rank}
-                onChange={(e) => setRank(e.target.value)}
-                className="rounded bg-slate-800 px-1 py-0.5 text-xs text-slate-200 ring-1 ring-slate-700 focus:outline-none"
-              >
-                {RANKS.map((r) => (
-                  <option key={r} value={r}>{r}</option>
-                ))}
-              </select>
-            </label>
-            <div
-              className="flex items-center gap-1 text-xs text-slate-400"
-              title={banCountSource === 'rank' ? 'Bans per team — default for current rank' : 'Bans per team — overridden'}
-            >
-              Bans
-              <div className="inline-flex overflow-hidden rounded ring-1 ring-slate-700">
-                {[3, 4, 5].map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => onBanCountChange(n)}
-                    className={`px-1.5 py-0.5 text-xs transition ${
-                      banCount === n
-                        ? 'bg-slate-100 text-slate-900'
-                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                    }`}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <label className="flex items-center gap-1 text-xs text-slate-400" title="Your lane — filters recommendations to the matching roles">
-              Lane
-              <select
-                value={lane}
-                onChange={(e) => setLane(e.target.value)}
-                className="rounded bg-slate-800 px-1 py-0.5 text-xs text-slate-200 ring-1 ring-slate-700 focus:outline-none"
-              >
-                {LANES.map((l) => (
-                  <option key={l} value={l}>{LANE_LABELS[l] ?? l}</option>
-                ))}
-              </select>
-            </label>
-            <span className="text-xs text-slate-400">
-              My pool: <span className="font-semibold text-slate-200">{ownedIds.size}</span>
-            </span>
-            <button
-              onClick={() => setPoolEditMode((v) => !v)}
-              className={`rounded px-2 py-1 text-xs transition ${
-                poolEditMode
-                  ? 'bg-amber-400 text-slate-900 hover:bg-amber-300'
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-              }`}
-            >
-              {poolEditMode ? 'Done editing' : 'Edit pool'}
-            </button>
-            <label
-              className={`flex items-center gap-1.5 rounded bg-slate-800 px-2 py-1 text-xs text-slate-300 ${
-                ownedIds.size === 0 ? 'cursor-not-allowed opacity-40' : 'cursor-pointer hover:bg-slate-700'
-              }`}
-              title={ownedIds.size === 0 ? 'Add heroes to your pool first' : 'Only suggest heroes you own'}
-            >
-              <input
-                type="checkbox"
-                checked={filterToOwned}
-                disabled={ownedIds.size === 0}
-                onChange={(e) => setFilterToOwned(e.target.checked)}
-                className="h-3 w-3 accent-amber-400"
-              />
-              Filter recs to my pool
-            </label>
-            <button
-              onClick={actions.reset}
-              className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-300 hover:bg-slate-700"
-            >
-              Reset draft
-            </button>
-          </div>
-        </div>
-      </header>
+    <div className="grid h-screen grid-rows-[auto_56px_minmax(0,1fr)_auto] overflow-hidden">
+      <HeaderBar
+        rank={rank}
+        ranks={RANKS}
+        lane={lane}
+        lanes={LANES}
+        laneLabels={LANE_LABELS}
+        banCount={banCount}
+        banCountSource={banCountSource}
+        onRankChange={setRank}
+        onLaneChange={setLane}
+        onBanCountChange={onBanCountChange}
+        onReset={actions.reset}
+      />
 
       {/* 56px ban-bar row. When data isn't loaded yet the row stays reserved
           (empty strip) so the main region doesn't jump once the roster lands. */}
@@ -515,6 +438,9 @@ export default function App() {
                 onPick={onPoolPick}
                 editMode={poolEditMode}
                 ownedIds={ownedIds}
+                filterToOwned={filterToOwned}
+                onEditModeChange={setPoolEditMode}
+                onFilterToOwnedChange={setFilterToOwned}
                 onToggleOwned={toggleOwned}
                 onHeroEnter={onHeroEnter}
                 onHeroLeave={onHeroLeave}
@@ -568,6 +494,11 @@ export default function App() {
           enemyPickIds={state.enemy.picks.filter((x) => x != null)}
         />
       )}
+
+      <FooterBar
+        heroCount={data ? Object.keys(data.heroes).length : null}
+        version={data?.version}
+      />
     </div>
   )
 }
