@@ -298,6 +298,13 @@ export default function App() {
     actions.fillSlot(heroId)
   }
 
+  const onPoolDropToTeam = useCallback((team, heroId) => {
+    const picks = state[team]?.picks
+    const index = picks?.findIndex((id) => id == null) ?? -1
+    if (index < 0) return
+    actions.fillAt(team, 'picks', index, heroId)
+  }, [actions, state])
+
   return (
     <div className="grid h-screen grid-rows-[auto_56px_minmax(0,1fr)] overflow-hidden">
       <header className="border-b border-slate-800 bg-slate-900/60 backdrop-blur">
@@ -458,6 +465,7 @@ export default function App() {
                 onHeroLeave={onHeroLeave}
                 leaderboardStats={statsByHeroId}
                 rankTotal={rankTotal}
+                onDropToTeam={onPoolDropToTeam}
               />
               <ResizeHandle height={recsH} onResize={setRecsH} />
               <Recommendations

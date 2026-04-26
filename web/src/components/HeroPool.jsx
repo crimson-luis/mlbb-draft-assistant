@@ -13,6 +13,29 @@ function hasOurDrag(dt) {
   return false
 }
 
+function getDraggedHeroId(dt) {
+  const raw = dt?.getData(DRAG_MIME) || dt?.getData('text/plain')
+  const id = Number.parseInt(raw, 10)
+  return Number.isFinite(id) ? id : null
+}
+
+const TEAM_DROP_ZONES = [
+  {
+    team: 'ally',
+    label: 'Blue team',
+    base: 'bg-sky-500/[0.08] ring-sky-300/20',
+    active: 'bg-sky-400/[0.16] ring-sky-200/50',
+    text: 'text-sky-100/80',
+  },
+  {
+    team: 'enemy',
+    label: 'Red team',
+    base: 'bg-rose-500/[0.08] ring-rose-300/20',
+    active: 'bg-rose-400/[0.16] ring-rose-200/50',
+    text: 'text-rose-100/80',
+  },
+]
+
 const ROLES = ['All', 'Tank', 'Fighter', 'Assassin', 'Mage', 'Marksman', 'Support']
 const ROLE_LABELS = { All: 'All Roles' }
 const FILTER_MODE_STORAGE_KEY = 'mlbb.heroPool.filterMode'
@@ -61,12 +84,15 @@ export default function HeroPool({
   onHeroLeave,
   leaderboardStats,
   rankTotal,
+  onDropToTeam,
 }) {
   const [query, setQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState('All')
   const [laneFilter, setLaneFilter] = useState('any')
   const [filterMode, setFilterMode] = useState(loadFilterMode)
   const [sort, setSort] = useState(loadSort)
+  const [draggingHeroId, setDraggingHeroId] = useState(null)
+  const [dropHoverTeam, setDropHoverTeam] = useState(null)
 
   useEffect(() => {
     try { localStorage.setItem(FILTER_MODE_STORAGE_KEY, filterMode) } catch { /* ignore */ }
@@ -105,12 +131,20 @@ export default function HeroPool({
     const onDrop = (e) => {
       if (!hasOurDrag(e.dataTransfer)) return
       e.preventDefault()
+      setDraggingHeroId(null)
+      setDropHoverTeam(null)
+    }
+    const onDragEnd = () => {
+      setDraggingHeroId(null)
+      setDropHoverTeam(null)
     }
     document.addEventListener('dragover', onDragOver)
     document.addEventListener('drop', onDrop)
+    document.addEventListener('dragend', onDragEnd)
     return () => {
       document.removeEventListener('dragover', onDragOver)
       document.removeEventListener('drop', onDrop)
+      document.removeEventListener('dragend', onDragEnd)
     }
   }, [])
 
@@ -159,8 +193,57 @@ export default function HeroPool({
     ? 'Edit mode: click heroes to add/remove them from your pool.'
     : null
 
+  const teamDropActive = draggingHeroId != null && !editMode && !!onDropToTeam
+  const teamDropHandlers = (team) => ({
+    onDragEnter: (e) => {
+      if (!hasOurDrag(e.dataTransfer)) return
+      e.preventDefault()
+      e.stopPropagation()
+      setDropHoverTeam((prev) => (prev === team ? prev : team))
+    },
+    onDragOver: (e) => {
+      if (!hasOurDrag(e.dataTransfer)) return
+      e.preventDefault()
+      e.stopPropagation()
+      e.dataTransfer.dropEffect = 'move'
+      setDropHoverTeam((prev) => (prev === team ? prev : team))
+    },
+    onDragLeave: () => {
+      setDropHoverTeam((prev) => (prev === team ? null : prev))
+    },
+    onDrop: (e) => {
+      if (!hasOurDrag(e.dataTransfer)) return
+      e.preventDefault()
+      e.stopPropagation()
+      const heroId = getDraggedHeroId(e.dataTransfer)
+      setDraggingHeroId(null)
+      setDropHoverTeam(null)
+      if (heroId != null) onDropToTeam(team, heroId)
+    },
+  })
+
   return (
-    <section className="flex min-h-0 flex-col gap-2 rounded-lg border border-slate-800 bg-slate-900/40 p-2">
+    <section className="relative flex min-h-0 flex-col gap-1 overflow-hidden rounded-lg border border-slate-800 bg-slate-900/40 p-1.5 lg:gap-2 lg:p-2">
+      {teamDropActive && (
+        <div className="absolute inset-0 z-20 grid grid-cols-2 overflow-hidden rounded-lg">
+          {TEAM_DROP_ZONES.map((zone) => {
+            const isActive = dropHoverTeam === zone.team
+            return (
+              <div
+                key={zone.team}
+                {...teamDropHandlers(zone.team)}
+                className={`relative flex items-center justify-center ring-1 ring-inset transition-colors duration-150 ${
+                  isActive ? zone.active : zone.base
+                }`}
+              >
+                <div className="pointer-events-none rounded border border-white/10 bg-slate-950/35 px-3 py-1.5 text-[10px] font-semibold uppercase shadow-sm backdrop-blur-sm">
+                  <span className={zone.text}>{zone.label}</span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
       <header className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="inline-flex overflow-hidden rounded ring-1 ring-slate-700">
           {['lane', 'role'].map((m) => (
@@ -264,7 +347,13 @@ export default function HeroPool({
                 e.dataTransfer.setData(DRAG_MIME, String(h.id))
                 e.dataTransfer.setData('text/plain', String(h.id))
                 e.dataTransfer.effectAllowed = 'move'
+                setDraggingHeroId(h.id)
+                setDropHoverTeam(null)
                 onHeroLeave?.()
+              }}
+              onDragEnd={() => {
+                setDraggingHeroId(null)
+                setDropHoverTeam(null)
               }}
               onMouseEnter={(e) => onHeroEnter?.(h.id, e.currentTarget)}
               onMouseLeave={() => onHeroLeave?.()}
