@@ -496,6 +496,8 @@ export default function App() {
           anchorRect={popHover.rect}
           onHoverKeep={onPopoverKeep}
           onHoverLeave={onHeroLeave}
+          allyPickIds={state.ally.picks.filter((x) => x != null)}
+          enemyPickIds={state.enemy.picks.filter((x) => x != null)}
         />
       )}
     </div>
