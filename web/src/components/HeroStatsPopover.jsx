@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import { wrTextTone } from './HeroOverlay'
 
@@ -63,7 +63,19 @@ function Headline({ label, value, tone }) {
   )
 }
 
-function HeroRow({ item, deltaTone }) {
+function teamRingClass(id, allySet, enemySet) {
+  if (allySet?.has(id)) return 'ring-2 ring-sky-400'
+  if (enemySet?.has(id)) return 'ring-2 ring-rose-400'
+  return 'ring-1 ring-slate-700'
+}
+
+function teamNameClass(id, allySet, enemySet) {
+  if (allySet?.has(id)) return 'text-sky-300 font-semibold'
+  if (enemySet?.has(id)) return 'text-rose-300 font-semibold'
+  return 'text-slate-200'
+}
+
+function HeroRow({ item, deltaTone, allySet, enemySet }) {
   return (
     <li className="flex items-center gap-1.5">
       <img
@@ -71,9 +83,9 @@ function HeroRow({ item, deltaTone }) {
         alt=""
         loading="lazy"
         onError={(e) => { e.currentTarget.style.visibility = 'hidden' }}
-        className="h-4 w-4 flex-none rounded-sm object-cover ring-1 ring-slate-700"
+        className={`h-4 w-4 flex-none rounded-sm object-cover ${teamRingClass(item.id, allySet, enemySet)}`}
       />
-      <span className="min-w-0 flex-1 truncate text-[11px] text-slate-200">{item.name}</span>
+      <span className={`min-w-0 flex-1 truncate text-[11px] ${teamNameClass(item.id, allySet, enemySet)}`}>{item.name}</span>
       {item.win_rate != null && (
         <span className="text-[10px] tabular-nums text-slate-400">{pct(item.win_rate)}</span>
       )}
@@ -86,22 +98,24 @@ function HeroRow({ item, deltaTone }) {
   )
 }
 
-function HeroList({ items, deltaTone }) {
+function HeroList({ items, deltaTone, allySet, enemySet }) {
   if (!items || items.length === 0) {
     return <div className="text-[11px] text-slate-500">No data.</div>
   }
   return (
     <ul className="space-y-0.5">
-      {items.map((it) => <HeroRow key={it.id} item={it} deltaTone={deltaTone} />)}
+      {items.map((it) => (
+        <HeroRow key={it.id} item={it} deltaTone={deltaTone} allySet={allySet} enemySet={enemySet} />
+      ))}
     </ul>
   )
 }
 
-function SidePanel({ title, items, deltaTone }) {
+function SidePanel({ title, items, deltaTone, allySet, enemySet }) {
   return (
     <div className="min-w-0 flex-1">
       <div className="mb-1 text-[10px] uppercase tracking-widest text-slate-500">{title}</div>
-      <HeroList items={items} deltaTone={deltaTone} />
+      <HeroList items={items} deltaTone={deltaTone} allySet={allySet} enemySet={enemySet} />
     </div>
   )
 }
@@ -167,7 +181,7 @@ function SkeletonBody() {
   )
 }
 
-function RelationRow({ title, items, tone }) {
+function RelationRow({ title, items, tone, allySet, enemySet }) {
   return (
     <div>
       <div className="mb-1 text-[10px] uppercase tracking-widest text-slate-500">{title}</div>
@@ -175,25 +189,33 @@ function RelationRow({ title, items, tone }) {
         <div className="text-[11px] text-slate-500">No data.</div>
       ) : (
         <div className="flex flex-wrap gap-2">
-          {items.map((it) => (
-            <div key={it.id} className="flex items-center gap-1.5 rounded bg-slate-900/60 px-1.5 py-0.5 ring-1 ring-slate-800">
-              <img
-                src={api.portraitUrl(it.id)}
-                alt=""
-                loading="lazy"
-                onError={(e) => { e.currentTarget.style.visibility = 'hidden' }}
-                className="h-4 w-4 flex-none rounded-sm object-cover ring-1 ring-slate-700"
-              />
-              <span className={`text-[11px] ${tone}`}>{it.name}</span>
-            </div>
-          ))}
+          {items.map((it) => {
+            const isAlly = allySet?.has(it.id)
+            const isEnemy = enemySet?.has(it.id)
+            const chipRing = isAlly ? 'ring-2 ring-sky-400' : isEnemy ? 'ring-2 ring-rose-400' : 'ring-1 ring-slate-800'
+            const nameTone = isAlly ? 'text-sky-300 font-semibold' : isEnemy ? 'text-rose-300 font-semibold' : tone
+            return (
+              <div key={it.id} className={`flex items-center gap-1.5 rounded bg-slate-900/60 px-1.5 py-0.5 ${chipRing}`}>
+                <img
+                  src={api.portraitUrl(it.id)}
+                  alt=""
+                  loading="lazy"
+                  onError={(e) => { e.currentTarget.style.visibility = 'hidden' }}
+                  className="h-4 w-4 flex-none rounded-sm object-cover ring-1 ring-slate-700"
+                />
+                <span className={`text-[11px] ${nameTone}`}>{it.name}</span>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
   )
 }
 
-export default function HeroStatsPopover({ heroId, hero, rank, anchorRect, onHoverKeep, onHoverLeave }) {
+export default function HeroStatsPopover({ heroId, hero, rank, anchorRect, onHoverKeep, onHoverLeave, allyPickIds, enemyPickIds }) {
+  const allySet = useMemo(() => new Set(allyPickIds || []), [allyPickIds])
+  const enemySet = useMemo(() => new Set(enemyPickIds || []), [enemyPickIds])
   const rankKey = rank || 'mythic'
   const [data, setData] = useState(() => cache.get(cacheKey(heroId, rankKey)) ?? null)
   const [error, setError] = useState(null)
@@ -291,19 +313,19 @@ export default function HeroStatsPopover({ heroId, hero, rank, anchorRect, onHov
           </div>
 
           <div className="flex gap-3">
-            <SidePanel title="Counters"     items={data.counters}       deltaTone="text-emerald-300" />
-            <SidePanel title="Countered by" items={data.countered_by}   deltaTone="text-rose-300" />
+            <SidePanel title="Counters"     items={data.counters}       deltaTone="text-emerald-300" allySet={allySet} enemySet={enemySet} />
+            <SidePanel title="Countered by" items={data.countered_by}   deltaTone="text-rose-300"    allySet={allySet} enemySet={enemySet} />
           </div>
 
           <div className="flex gap-3">
-            <SidePanel title="Compatible"     items={data.compatible}     deltaTone="text-sky-300" />
-            <SidePanel title="Not compatible" items={data.not_compatible} deltaTone="text-rose-300" />
+            <SidePanel title="Compatible"     items={data.compatible}     deltaTone="text-sky-300"  allySet={allySet} enemySet={enemySet} />
+            <SidePanel title="Not compatible" items={data.not_compatible} deltaTone="text-rose-300" allySet={allySet} enemySet={enemySet} />
           </div>
 
           <div className="flex flex-col gap-1.5 rounded bg-slate-900/40 p-2">
-            <RelationRow title="Strong against" items={data.relation_strong} tone="text-emerald-300" />
-            <RelationRow title="Weak against"   items={data.relation_weak}   tone="text-rose-300" />
-            <RelationRow title="Assists"        items={data.relation_assist} tone="text-sky-300" />
+            <RelationRow title="Strong against" items={data.relation_strong} tone="text-emerald-300" allySet={allySet} enemySet={enemySet} />
+            <RelationRow title="Weak against"   items={data.relation_weak}   tone="text-rose-300"    allySet={allySet} enemySet={enemySet} />
+            <RelationRow title="Assists"        items={data.relation_assist} tone="text-sky-300"     allySet={allySet} enemySet={enemySet} />
           </div>
 
           <div className="text-[9px] text-slate-600">
