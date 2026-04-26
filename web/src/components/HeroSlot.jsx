@@ -5,6 +5,7 @@ import { roleBorder } from './roleStyles'
 
 export default function HeroSlot({
   hero,
+  team,
   kind,
   selecting,
   onSelect,
@@ -71,6 +72,10 @@ export default function HeroSlot({
       <button
         type="button"
         {...handlers}
+        data-draft-slot={team != null && slotIndex != null ? 'true' : undefined}
+        data-draft-team={team}
+        data-draft-kind={kind}
+        data-draft-index={slotIndex}
         className={`relative flex aspect-square w-full items-center justify-center overflow-hidden ${portraitShape} ${bg} ${ring} ${pulseClass} transition ${mutedOptional ? 'opacity-60 hover:opacity-100' : ''}`}
         aria-label={ariaLabel}
       >
@@ -106,6 +111,10 @@ export default function HeroSlot({
     <button
       type="button"
       {...handlers}
+      data-draft-slot={team != null && slotIndex != null ? 'true' : undefined}
+      data-draft-team={team}
+      data-draft-kind={kind}
+      data-draft-index={slotIndex}
       className={`grid h-[112px] w-[84px] grid-rows-[84px_28px] overflow-hidden rounded ${ring} ${pulseClass} transition ${mutedOptional ? 'opacity-60 hover:opacity-100' : ''}`}
       aria-label={ariaLabel}
     >

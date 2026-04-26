@@ -79,11 +79,15 @@ export default function PickRow({
     <button
       type="button"
       {...handlers}
+      data-draft-slot="true"
+      data-draft-team={team}
+      data-draft-kind="picks"
+      data-draft-index={slotIndex}
       aria-label={ariaLabel}
       className={`relative block h-[84px] w-full cursor-pointer overflow-hidden sm:h-[92px] lg:h-[112px] ${pulseClass} ${ringBase} transition`}
     >
       <div className="absolute inset-0 overflow-hidden">
-        {/* Portrait keeps its aspect ratio; mask fades its inner edge toward HeroPool. */}
+        {/* Double-height art is clipped by the row so only the top half shows. */}
         {filled ? (
           <img
             src={api.portraitFullUrl(hero.id)}
@@ -93,7 +97,7 @@ export default function PickRow({
               WebkitMaskImage: maskImage,
               maskImage,
             }}
-            className={`absolute top-0 ${imageEdge} h-full w-auto max-w-none object-contain`}
+            className={`absolute top-0 ${imageEdge} h-[200%] w-auto max-w-none object-contain`}
           />
         ) : (
           <div className={`flex h-full items-center ${isAlly ? 'justify-start pl-4' : 'justify-end pr-4'} text-2xl text-slate-700`}>

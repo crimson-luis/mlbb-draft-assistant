@@ -20,7 +20,9 @@ function BanGroup({ team, state, heroesById, selectingSlot, actions, banCount, o
           <div key={`${team}-ban-${i}`} className={`h-9 w-9 rounded-full ring-1 sm:h-11 sm:w-11 lg:h-[52px] lg:w-[52px] ${meta.ringTone}`}>
             <HeroSlot
               hero={hero}
+              team={team}
               kind="bans"
+              slotIndex={i}
               selecting={selectingSlot(team, 'bans', i)}
               onSelect={() => actions.selectSlot(team, 'bans', i)}
               onClear={() => actions.clearSlot(team, 'bans', i)}
