@@ -7,17 +7,19 @@ import BanBar from './components/BanBar'
 import PickColumn from './components/PickColumn'
 import HeroPool from './components/HeroPool'
 import Recommendations from './components/Recommendations'
+import DraftPower from './components/DraftPower'
 import HeroStatsPopover from './components/HeroStatsPopover'
 import { LANE_ROLES, LANES, LANE_LABELS } from './lanes'
+import { getDraftPower } from './compositionPower'
 
 const OWNED_STORAGE_KEY = 'mlbb:ownedHeroes'
 const RANK_STORAGE_KEY = 'mlbb:rank'
 const LANE_STORAGE_KEY = 'mlbb:lane'
 const BAN_COUNT_STORAGE_KEY = 'mlbb:banCount'
 const RECS_H_STORAGE_KEY = 'mlbb:recsH'
-const RECS_H_MIN = 80
-const RECS_H_MAX = 500
-const RECS_H_DEFAULT = 128
+const RECS_H_MIN = 192
+const RECS_H_MAX = 620
+const RECS_H_DEFAULT = 220
 const RANKS = ['all', 'epic', 'legend', 'mythic', 'honor', 'glory']
 
 // Ban-count defaults by rank tier (MLBB in-game rules):
@@ -204,6 +206,28 @@ export default function App() {
     () => (data ? Object.values(data.heroes) : []),
     [data],
   )
+
+  const synergyPairs = useMemo(
+    () => data?.counter_graph?.synergies ?? [],
+    [data],
+  )
+
+  const draftPowers = useMemo(() => ({
+    ally: getDraftPower({
+      picks: state.ally.picks,
+      heroesById,
+      statsByHeroId,
+      rankTotal,
+      synergyPairs,
+    }),
+    enemy: getDraftPower({
+      picks: state.enemy.picks,
+      heroesById,
+      statsByHeroId,
+      rankTotal,
+      synergyPairs,
+    }),
+  }), [state.ally.picks, state.enemy.picks, heroesById, statsByHeroId, rankTotal, synergyPairs])
 
   // Respect the active ban count — bans beyond the visible slots shouldn't
   // influence scoring or mark heroes as used.
@@ -422,7 +446,7 @@ export default function App() {
         )}
       </div>
 
-      <main className="grid min-h-0 grid-cols-1 gap-2 overflow-y-auto px-2 py-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1200px)_minmax(0,1fr)] lg:gap-0 lg:overflow-hidden lg:px-0">
+      <main className="grid min-h-0 grid-cols-1 gap-2 overflow-y-auto px-2 py-2 lg:grid-cols-[minmax(160px,1fr)_minmax(200px,1200px)_minmax(160px,1fr)] lg:gap-0 lg:overflow-hidden lg:px-0">
         {error && (
           <div className="flex items-center justify-center lg:col-span-3">
             <div className="rounded border border-rose-700 bg-rose-950/50 p-4 text-sm text-rose-200">
@@ -452,6 +476,7 @@ export default function App() {
               onHeroLeave={onHeroLeave}
               leaderboardStats={statsByHeroId}
               rankTotal={rankTotal}
+              draftPower={draftPowers.ally}
             />
             <section
               className="order-3 grid min-h-[520px] w-full min-w-0 px-0 lg:order-none lg:min-h-0 lg:px-2"
@@ -473,18 +498,21 @@ export default function App() {
                 onDropToSlot={onPoolDropToSlot}
               />
               <ResizeHandle height={recsH} onResize={setRecsH} />
-              <Recommendations
-                recommendations={recs}
-                heroesById={heroesById}
-                loading={recsLoading}
-                error={recsError}
-                hasInput={hasInput}
-                filterToOwnedActive={filterToOwnedActive}
-                onHeroEnter={onHeroEnter}
-                onHeroLeave={onHeroLeave}
-                leaderboardStats={statsByHeroId}
-                rankTotal={rankTotal}
-              />
+              <div className="grid min-h-0 gap-2 overflow-y-auto xl:grid-cols-[minmax(0,1fr)_360px] xl:overflow-hidden">
+                <Recommendations
+                  recommendations={recs}
+                  heroesById={heroesById}
+                  loading={recsLoading}
+                  error={recsError}
+                  hasInput={hasInput}
+                  filterToOwnedActive={filterToOwnedActive}
+                  onHeroEnter={onHeroEnter}
+                  onHeroLeave={onHeroLeave}
+                  leaderboardStats={statsByHeroId}
+                  rankTotal={rankTotal}
+                />
+                <DraftPower draftPowers={draftPowers} />
+              </div>
             </section>
             <PickColumn
               team="enemy"
@@ -496,6 +524,7 @@ export default function App() {
               onHeroLeave={onHeroLeave}
               leaderboardStats={statsByHeroId}
               rankTotal={rankTotal}
+              draftPower={draftPowers.enemy}
             />
           </>
         )}
