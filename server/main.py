@@ -101,6 +101,32 @@ def portrait(hero_id: int):
     return FileResponse(path)
 
 
+# Full-body portraits live in scraper/output/portraits_full/{id}.{ext}. They're
+# only rendered in the pick slots; pool tiles + ban slots use the smaller round
+# face crop served by /api/portrait. If a hero has no full-body asset we fall
+# back to the face crop so the UI still renders something.
+_FULL_PORTRAIT_EXTS = (".png", ".jpg", ".jpeg", ".webp")
+
+
+def _find_full_portrait(hero_id: int) -> Path | None:
+    for ext in _FULL_PORTRAIT_EXTS:
+        p = DATA_DIR / "portraits_full" / f"{hero_id}{ext}"
+        if p.exists():
+            return p
+    return None
+
+
+@app.get("/api/portrait/{hero_id}/full")
+def portrait_full(hero_id: int):
+    if str(hero_id) not in HERO_DATA.get("heroes", {}):
+        raise HTTPException(status_code=404, detail="hero not found")
+    full = _find_full_portrait(hero_id)
+    if full is not None:
+        return FileResponse(full)
+    # Fallback to the face crop so the pick slot is never empty.
+    return portrait(hero_id)
+
+
 @app.post("/api/recommend")
 def recommend(req: RecommendRequest) -> dict:
     return score_draft(

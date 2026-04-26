@@ -22,6 +22,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import sys
 import tempfile
 import time
@@ -35,6 +36,11 @@ API_BASE = "https://openmlbb.fastapicloud.dev"
 LIST_URL = f"{API_BASE}/api/heroes"
 DETAIL_URL = f"{API_BASE}/api/heroes"  # /{hero_id}
 LIST_PAGE_SIZE = 200
+
+# Moonton's official lore page hosts richer portrait art (vs. the small head
+# crops returned by openmlbb). Site only exposes hero names, so we match its
+# entries against names from openmlbb to recover the hero id.
+LORE_LIST_URL = "https://play.mobilelegends.com/lore/heroList"
 
 OUT_DIR = Path(__file__).resolve().parent / "output"
 PORTRAIT_DIR = OUT_DIR / "portraits"
@@ -94,7 +100,78 @@ def fetch_hero_detail(session: requests.Session, heroid: int) -> dict:
     return records[0].get("data") or {}
 
 
-def download_portrait(session: requests.Session, heroid: int, url: str) -> str:
+def _normalize_name(name: str) -> str:
+    """Lowercase + collapse whitespace + strip punctuation noise so names from
+    different sources collide cleanly (e.g. "Yi Sun-shin" vs "yi sun shin")."""
+    s = (name or "").strip().lower()
+    s = re.sub(r"[^a-z0-9]+", "", s)
+    return s
+
+
+# Regex for the lore page list items. The HTML structure is consistent:
+#   <li class="list-item-box">
+#       <div class="list-item"><img src="//host/path.png" alt="">
+#           <div class="item-info"><h4 class="name v-html-content-box">Name</h4>
+# Names may have surrounding whitespace and may span lines.
+_LORE_ITEM_RE = re.compile(
+    r'<li[^>]*class="list-item-box"[^>]*>.*?'
+    r'<img[^>]*\bsrc="([^"]+)"[^>]*>.*?'
+    r'<h4[^>]*class="name[^"]*"[^>]*>\s*([^<]+?)\s*</h4>',
+    re.DOTALL,
+)
+
+
+def fetch_lore_portraits(session: requests.Session) -> dict[str, str]:
+    """Return {normalized_name: absolute_image_url} from the lore page.
+
+    Uses a browser-ish User-Agent because the lore site rejects our scraper UA.
+    Returns {} on any error so the caller can fall back to the openmlbb head URL.
+    """
+    log.info("GET %s", LORE_LIST_URL)
+    try:
+        r = session.get(
+            LORE_LIST_URL,
+            timeout=REQUEST_TIMEOUT,
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0 Safari/537.36"
+                ),
+                "Accept": "text/html,application/xhtml+xml",
+            },
+        )
+        r.raise_for_status()
+    except Exception as e:
+        log.warning("lore page fetch failed: %s — falling back to openmlbb portraits", e)
+        return {}
+
+    html = r.text
+    print(html)
+    out: dict[str, str] = {}
+    for src, name in _LORE_ITEM_RE.findall(html):
+        url = src.strip()
+        if url.startswith("//"):
+            url = "https:" + url
+        elif url.startswith("/"):
+            url = "https://play.mobilelegends.com" + url
+        key = _normalize_name(name)
+        if not key or not url:
+            continue
+        # First occurrence wins; lore page should not have dupes anyway.
+        out.setdefault(key, url)
+
+    log.info("lore page: parsed %d hero portraits", len(out))
+    return out
+
+
+def download_portrait(
+    session: requests.Session,
+    heroid: int,
+    url: str,
+    *,
+    force: bool = False,
+) -> str:
     if not url:
         raise ValueError(f"hero {heroid}: empty portrait url")
 
@@ -106,7 +183,7 @@ def download_portrait(session: requests.Session, heroid: int, url: str) -> str:
     filename = f"{heroid}{ext}"
     out_path = PORTRAIT_DIR / filename
 
-    if out_path.exists() and out_path.stat().st_size > 0:
+    if not force and out_path.exists() and out_path.stat().st_size > 0:
         return f"portraits/{filename}"
 
     r = session.get(url, timeout=REQUEST_TIMEOUT)
@@ -114,6 +191,17 @@ def download_portrait(session: requests.Session, heroid: int, url: str) -> str:
     tmp = out_path.with_suffix(out_path.suffix + ".part")
     tmp.write_bytes(r.content)
     tmp.replace(out_path)
+
+    # When forcing a refresh from a different source, an old file may exist with
+    # a different extension (e.g. .png stale + .jpg new). Remove stale variants
+    # so the backend's directory listing only finds the current portrait.
+    for stale in PORTRAIT_DIR.glob(f"{heroid}.*"):
+        if stale != out_path and not stale.name.endswith(".part"):
+            try:
+                stale.unlink()
+            except OSError:
+                pass
+
     return f"portraits/{filename}"
 
 
@@ -306,8 +394,22 @@ def main() -> int:
         if name:
             names_by_id[hid] = name
 
+    # Lore-page portraits (richer artwork than openmlbb's small head crop). Map
+    # is name-keyed; we re-key to id below using the openmlbb name list.
+    lore_portraits = fetch_lore_portraits(session)
+    lore_by_id: dict[int, str] = {}
+    for hid, name in names_by_id.items():
+        url = lore_portraits.get(_normalize_name(name))
+        if url:
+            lore_by_id[hid] = url
+    log.info(
+        "lore portraits matched: %d / %d heroes (rest will fall back to openmlbb head)",
+        len(lore_by_id), len(names_by_id),
+    )
+
     heroes: dict[str, dict] = {}
     failures: list[tuple[int, str]] = []
+    portrait_sources = {"lore": 0, "openmlbb": 0}
     total = len(list_entries)
 
     for i, (heroid, entry) in enumerate(sorted(list_entries.items()), 1):
@@ -319,24 +421,33 @@ def main() -> int:
             time.sleep(DETAIL_SLEEP_SECONDS)
             continue
 
-        portrait_url = (
+        lore_url = lore_by_id.get(heroid)
+        fallback_url = (
             ((detail.get("hero") or {}).get("data") or {}).get("head")
             or detail.get("head")
             or ((entry.get("hero") or {}).get("data") or {}).get("head")
             or entry.get("head")
             or ""
         )
+        portrait_url = lore_url or fallback_url
+        source = "lore" if lore_url else "openmlbb"
+        # Force re-download when the source switches sources (lore on a previous
+        # openmlbb-only run or vice versa) by always refetching the lore-sourced
+        # ones; openmlbb fallbacks keep the old skip-if-exists semantics.
         try:
-            portrait_rel = download_portrait(session, heroid, portrait_url)
+            portrait_rel = download_portrait(
+                session, heroid, portrait_url, force=(source == "lore"),
+            )
+            portrait_sources[source] += 1
         except Exception as e:
-            log.error("[%3d/%d] id=%d portrait download failed: %s", i, total, heroid, e)
+            log.error("[%3d/%d] id=%d portrait download failed (%s): %s", i, total, heroid, source, e)
             failures.append((heroid, f"portrait: {e}"))
             time.sleep(DETAIL_SLEEP_SECONDS)
             continue
 
         hero = hero_from_detail(heroid, entry, detail, portrait_rel, names_by_id)
         heroes[str(heroid)] = hero
-        log.info("[%3d/%d] %s (id=%d) ok — %s", i, total, hero["name"], heroid, hero["role"] or "?")
+        log.info("[%3d/%d] %s (id=%d) ok — %s [%s]", i, total, hero["name"], heroid, hero["role"] or "?", source)
         time.sleep(DETAIL_SLEEP_SECONDS)
 
     counter_graph = build_counter_graph(heroes, list_entries)
@@ -360,6 +471,8 @@ def main() -> int:
     log.info("wrote %s (%d heroes, %d counter edges, %d synergy edges)",
              HEROES_JSON, len(heroes),
              len(counter_graph["counters"]), len(counter_graph["synergies"]))
+    log.info("portrait sources: lore=%d, openmlbb=%d",
+             portrait_sources["lore"], portrait_sources["openmlbb"])
 
     if failures:
         log.warning("%d heroes had errors but overall run passed validation:", len(failures))
