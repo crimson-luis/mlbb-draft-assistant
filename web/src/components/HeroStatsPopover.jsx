@@ -127,9 +127,9 @@ function SkeletonBar({ width = 'w-full', height = 'h-3' }) {
 function SkeletonBody() {
   return (
     <>
-      {/* Stats bars: 4 short bars mirroring the real Mag/Phy/Dur/Diff row. */}
+      {/* Stats bars: 4 short bars mirroring the real Control/Offense/Dur/Diff row. */}
       <div className="flex gap-2">
-        {['Mag', 'Phy', 'Dur', 'Diff'].map((label) => (
+        {['Control', 'Offense', 'Dur', 'Diff'].map((label) => (
           <div key={label} className="flex flex-1 flex-col items-center gap-0.5">
             <div className="flex w-full items-baseline justify-between">
               <span className="text-[9px] uppercase tracking-widest text-slate-500">{label}</span>
@@ -289,8 +289,8 @@ export default function HeroStatsPopover({ heroId, hero, rank, anchorRect, onHov
 
       {(heroStats.magic != null || heroStats.physical != null) && (
         <div className="flex gap-2">
-          <StatBar label="Mag"  value={heroStats.magic} />
-          <StatBar label="Phy"  value={heroStats.physical} />
+          <StatBar label="Control" value={heroStats.magic} />
+          <StatBar label="Offense" value={heroStats.physical} />
           <StatBar label="Dur"  value={heroStats.durability} />
           <StatBar label="Diff" value={heroStats.difficulty} />
         </div>

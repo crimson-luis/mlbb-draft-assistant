@@ -583,6 +583,14 @@ export default function HeroPool({
               aria-label={`${h.name} (${h.role})`}
               title={!editMode && used ? `${h.name} - already used` : h.name}
             >
+              {owned && (
+                <span
+                  aria-label="in my pool"
+                  className="pointer-events-none absolute right-0.5 top-0 z-10 text-sm leading-none text-slate-400 drop-shadow"
+                >
+                  &#9733;
+                </span>
+              )}
               <div className={`relative h-14 w-14 flex-none overflow-hidden rounded-full bg-slate-800 ring-1 sm:h-16 sm:w-16 lg:h-[72px] lg:w-[72px] ${
                 editMode && owned ? 'ring-amber-400' : 'ring-slate-700 group-hover:ring-slate-400'
               }`}>
@@ -593,14 +601,6 @@ export default function HeroPool({
                   loading="lazy"
                   className="h-full w-full object-cover"
                 />
-                {owned && (
-                  <span
-                    aria-label="in my pool"
-                    className="absolute left-0.5 top-0.5 rounded bg-amber-400/90 px-1 text-[9px] font-bold leading-4 text-slate-900"
-                  >
-                    &#9733;
-                  </span>
-                )}
               </div>
               <span className="flex w-full items-center justify-center gap-1 truncate text-center text-[9px] font-medium leading-none text-slate-100 sm:text-[10px]" title={h.name}>
                 {stats?.rank ? (

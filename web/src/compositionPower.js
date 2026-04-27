@@ -142,7 +142,7 @@ function damageSpread(heroes) {
 
   return {
     points: Math.round(clamp(points, 0, 15)),
-    detail: `${counts.physical} physical, ${counts.magic} magic, ${counts.mixed} mixed`,
+    detail: `${counts.physical} offense, ${counts.magic} control, ${counts.mixed} mixed`,
   }
 }
 

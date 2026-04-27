@@ -115,7 +115,7 @@ export default function HeroSlot({
       data-draft-team={team}
       data-draft-kind={kind}
       data-draft-index={slotIndex}
-      className={`grid h-[112px] w-[84px] grid-rows-[84px_28px] overflow-hidden rounded ${ring} ${pulseClass} transition ${mutedOptional ? 'opacity-60 hover:opacity-100' : ''}`}
+      className={`grid h-[152px] w-[84px] grid-rows-[132px_28px] overflow-hidden rounded ${ring} ${pulseClass} transition ${mutedOptional ? 'opacity-60 hover:opacity-100' : ''}`}
       aria-label={ariaLabel}
     >
       <div className={`relative flex items-center justify-center overflow-hidden ${bg}`}>
