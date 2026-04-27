@@ -134,7 +134,6 @@ export default function DraftPower({ draftPowers, leaderboardStatus }) {
     <section className="grid min-h-0 min-w-0 grid-rows-[auto_auto_minmax(0,1fr)] gap-2 overflow-hidden rounded-lg border border-slate-800 bg-slate-900/40 p-2">
       <header className="flex h-4 min-w-0 items-center gap-2">
         <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-300">Draft Power</h2>
-        <span className="ml-auto text-[9px] uppercase tracking-wider text-slate-600">display only</span>
       </header>
 
       <div className="grid min-w-0 grid-cols-[repeat(2,minmax(0,1fr))] gap-1.5">

@@ -5,7 +5,7 @@ Three processes, one per component. All commands are run from the project root
 
 ## 1. Scraper — one-shot
 
-Populates `scraper/output/heroes.json` + `scraper/output/portraits/` from
+Populates `server/data/heroes.json` + `server/data/portraits/` from
 `openmlbb.fastapicloud.dev`. Re-run only when you want fresh data.
 
 ```powershell
@@ -58,6 +58,6 @@ frontend need to be started each time; the scraper is one-shot.
 |--------------------------------------------|--------------------------------------------------------------------------------------|
 | Backend reports `heroes: 124` not 132      | Uvicorn loaded the old JSON before the re-scrape. Restart uvicorn.                   |
 | Frontend: `Failed to load hero data`       | Backend isn't on :8000, or `VITE_API_BASE` is set to a different URL.                |
-| Portraits don't render                     | Missing files in `scraper/output/portraits/`. Re-run the scraper.                    |
+| Portraits don't render                     | Missing files in `server/data/portraits/`. Re-run the scraper.                       |
 | `heroes.json not found` at backend startup | Set `MLBB_DATA_DIR` or place a copy/symlink at `server/data/heroes.json`.            |
 | Stats popover stuck on loading             | Upstream `openmlbb.fastapicloud.dev` is slow/down. Check backend logs for 502/504.   |

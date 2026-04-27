@@ -13,8 +13,8 @@ counter graph.
 
 Run:  python scrape.py
 Output:
-  scraper/output/heroes.json
-  scraper/output/portraits/<id>.<ext>
+  server/data/heroes.json
+  server/data/portraits/<id>.<ext>
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ LIST_PAGE_SIZE = 200
 # entries against names from openmlbb to recover the hero id.
 LORE_LIST_URL = "https://play.mobilelegends.com/lore/heroList"
 
-OUT_DIR = Path(__file__).resolve().parent / "output"
+OUT_DIR = Path(__file__).resolve().parent.parent / "server" / "data"
 PORTRAIT_DIR = OUT_DIR / "portraits"
 HEROES_JSON = OUT_DIR / "heroes.json"
 

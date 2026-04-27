@@ -14,9 +14,8 @@ dist-ssr/
 .vite/
 *.local
 
-# Generated scraper output (run `python scrape.py` to regenerate)
-scraper/output/portraits/
-scraper/output/screens/
+# Legacy scraper scratch output; canonical checked-in data lives in server/data/
+scraper/output/
 
 # IDE
 .idea/

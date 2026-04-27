@@ -8,8 +8,7 @@ Endpoints:
 
 Dataset is loaded once at import time. Resolution order for the data dir:
   1. $MLBB_DATA_DIR            (override)
-  2. server/data               (copy or symlink of scraper/output)
-  3. ../scraper/output         (dev default — reads straight from the scraper)
+  2. server/data               (canonical local dataset)
 """
 
 from __future__ import annotations
@@ -31,7 +30,6 @@ BASE_DIR = Path(__file__).resolve().parent
 _CANDIDATES = [
     Path(os.environ["MLBB_DATA_DIR"]) if os.environ.get("MLBB_DATA_DIR") else None,
     BASE_DIR / "data",
-    BASE_DIR.parent / "scraper" / "output",
 ]
 
 
@@ -106,7 +104,7 @@ def portrait(hero_id: int):
     return FileResponse(path)
 
 
-# Full-body portraits live in scraper/output/portraits_full/{id}.{ext}. They're
+# Full-body portraits live in server/data/portraits_full/{id}.{ext}. They're
 # only rendered in the pick slots; pool tiles + ban slots use the smaller round
 # face crop served by /api/portrait. If a hero has no full-body asset we fall
 # back to the face crop so the UI still renders something.

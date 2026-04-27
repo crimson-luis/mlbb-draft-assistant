@@ -199,7 +199,7 @@ export default function App() {
   const [draftPowerW, setDraftPowerW] = useState(loadDraftPowerW)
 
   const { state, actions, usedIds, recommendPayload, selectingSlot } = useDraftState()
-  const { hover: popHover, onHeroEnter, onHeroLeave, onPopoverKeep } = useHeroPopover()
+  const { hover: popHover, onHeroEnter, onHeroLeave, onPopoverKeep, clearHover } = useHeroPopover()
   const {
     statsByHeroId,
     rankTotal,
@@ -262,6 +262,17 @@ export default function App() {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
+      return next
+    })
+  }, [])
+
+  const setOwnedForIds = useCallback((ids, owned) => {
+    setOwnedIds((prev) => {
+      const next = new Set(prev)
+      for (const id of ids) {
+        if (owned) next.add(id)
+        else next.delete(id)
+      }
       return next
     })
   }, [])
@@ -388,6 +399,10 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [actions, poolEditMode])
 
+  useEffect(() => {
+    if (poolEditMode) clearHover()
+  }, [clearHover, poolEditMode])
+
   // v2 seam: expose a tiny imperative API so a future screen-capture module
   // can push detected draft state in without touching the UI. Same payload
   // shape as the reducer state (minus `selecting`).
@@ -501,6 +516,7 @@ export default function App() {
                 ownedIds={ownedIds}
                 onEditModeChange={setPoolEditMode}
                 onToggleOwned={toggleOwned}
+                onSetOwnedForIds={setOwnedForIds}
                 onHeroEnter={onHeroEnter}
                 onHeroLeave={onHeroLeave}
                 leaderboardStats={statsByHeroId}

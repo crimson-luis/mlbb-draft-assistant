@@ -210,7 +210,7 @@ No database, no auth, no secrets. Everything runs on `localhost`.
 See [RUNNING.md](RUNNING.md) for the full three-process recipe. Short version:
 
 ```powershell
-# one-shot, populates scraper/output/
+# one-shot, populates server/data/
 cd scraper && python scrape.py
 
 # backend on :8000
