@@ -82,7 +82,7 @@ export default function PickRow({
       data-draft-kind="picks"
       data-draft-index={slotIndex}
       aria-label={ariaLabel}
-      className={`relative block h-[152px] w-full cursor-pointer overflow-hidden ${pulseClass} ${ringBase} transition`}
+      className={`relative block h-[148px] w-full cursor-pointer overflow-hidden ${pulseClass} ${ringBase} transition`}
     >
       <div className="absolute inset-0 overflow-hidden">
         {/* Double-height art is clipped by the row so only the top half shows. */}

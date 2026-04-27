@@ -31,14 +31,11 @@ mlbb-draft-assistant/
 ├── scraper/              # Python: one-shot harvest of MLBB API
 │   ├── scrape.py
 │   ├── requirements.txt
-│   └── output/
-│       ├── heroes.json
-│       └── portraits/    # 124 PNG/JPG files, named by hero ID
 ├── server/               # Python FastAPI: proxy + recommendations
 │   ├── main.py
 │   ├── recommender.py
 │   ├── requirements.txt
-│   └── data/             # symlink or copy of scraper/output
+│   └── data/             # heroes.json + cached portraits used by backend
 ├── web/                  # React + Vite + Tailwind frontend
 │   ├── src/
 │   │   ├── App.jsx
@@ -228,7 +225,7 @@ Deliberately avoiding: databases (JSON is enough), auth (not needed for v1), sta
 Build strictly in this order. Do not start a phase until the previous one runs end-to-end.
 
 ### Phase 1 — Scraper (~half day)
-Deliverable: `scraper/output/heroes.json` + `scraper/output/portraits/*.png`.
+Deliverable: `server/data/heroes.json` + `server/data/portraits/*.png`.
 
 1. `scrape.py` hits `/api/heroes?size=200`, iterates all `hero_id` values.
 2. For each hero: call `/api/heroes/{id}`, parse fields into the canonical schema above.
@@ -324,7 +321,7 @@ npm run dev
 
 1. **Re-scrape cadence**: manual for v1. A cron or GitHub Action can come later.
 2. **Counter graph enrichment**: MLBB's API gives sparse data. Post-v1, consider supplementing with community sources — but only if the baseline proves too thin in practice.
-3. **Deployment**: local-only for v1. If we ship it publicly, the backend needs rate-limiting and the scraper output should live in a CDN.
+3. **Deployment**: local-only for v1. If we ship it publicly, the backend needs rate-limiting and the generated backend data should live in a CDN.
 4. **v2 screen capture**: will need calibration UI for the LonelyScreen window region, and a template-matching pipeline (OpenCV.js). Out of scope for v1.
 
 ---

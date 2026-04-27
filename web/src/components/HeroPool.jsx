@@ -96,30 +96,6 @@ function loadSort() {
   }
 }
 
-function MyPoolPopover({
-  ownedCount,
-  editMode,
-  onEditModeChange,
-}) {
-  return (
-    <div className="absolute right-0 top-[calc(100%+0.4rem)] z-40 w-[calc(100vw-2rem)] max-w-72 rounded-lg border border-slate-700 bg-slate-950 p-3 shadow-2xl shadow-black/40 sm:w-72">
-      <div className="grid gap-2">
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">My Pool</span>
-          <span className="text-xs font-semibold text-slate-200">{ownedCount} heroes</span>
-        </div>
-        <button
-          type="button"
-          onClick={() => onEditModeChange((value) => !value)}
-          className={buttonClass(editMode ? 'warning' : 'neutral', 'min-h-9 justify-start text-sm')}
-        >
-          {editMode ? 'Done editing' : 'Edit pool'}
-        </button>
-      </div>
-    </div>
-  )
-}
-
 export default function HeroPool({
   heroes,
   usedIds,
@@ -129,6 +105,7 @@ export default function HeroPool({
   ownedIds,
   onEditModeChange,
   onToggleOwned,
+  onSetOwnedForIds,
   onHeroEnter,
   onHeroLeave,
   leaderboardStats,
@@ -142,10 +119,8 @@ export default function HeroPool({
   const [filterMode, setFilterMode] = useState(loadFilterMode)
   const [sort, setSort] = useState(loadSort)
   const [dragState, setDragState] = useState(null)
-  const [poolMenuOpen, setPoolMenuOpen] = useState(false)
   const [controlsOpen, setControlsOpen] = useState(false)
   const poolRef = useRef(null)
-  const poolMenuRef = useRef(null)
   const pendingDragRef = useRef(null)
   const removePointerListenersRef = useRef(null)
   const suppressClickRef = useRef(false)
@@ -161,22 +136,6 @@ export default function HeroPool({
       // ignore quota / disabled storage
     }
   }, [sort])
-
-  useEffect(() => {
-    if (!poolMenuOpen) return undefined
-    const onPointerDown = (e) => {
-      if (!poolMenuRef.current?.contains(e.target)) setPoolMenuOpen(false)
-    }
-    const onKeyDown = (e) => {
-      if (e.key === 'Escape') setPoolMenuOpen(false)
-    }
-    window.addEventListener('pointerdown', onPointerDown)
-    window.addEventListener('keydown', onKeyDown)
-    return () => {
-      window.removeEventListener('pointerdown', onPointerDown)
-      window.removeEventListener('keydown', onKeyDown)
-    }
-  }, [poolMenuOpen])
 
   const setSortField = (field) => {
     setSort((prev) => {
@@ -279,8 +238,19 @@ export default function HeroPool({
     if (selecting && !usedIds.has(hero.id)) onPick(hero.id)
   }
 
+  const visibleHeroIds = useMemo(() => list.map((h) => h.id), [list])
+  const allVisibleOwned = visibleHeroIds.length > 0 && visibleHeroIds.every((id) => ownedIds?.has(id))
+  const visibleBulkLabel =
+    visibleHeroIds.length === 0 ? 'No visible heroes' :
+    allVisibleOwned ? 'Deselect visible' :
+    'Select visible'
+  const onToggleVisibleOwned = () => {
+    if (visibleHeroIds.length === 0) return
+    onSetOwnedForIds?.(visibleHeroIds, !allVisibleOwned)
+  }
+
   const editHint = editMode
-    ? 'Edit mode: click heroes to add/remove them from your pool.'
+    ? 'Edit mode: click heroes to add/remove them, or use the visible-list bulk action.'
     : null
   const totalCount = heroes.length
   const availableCount = Math.max(0, totalCount - usedIds.size)
@@ -462,24 +432,16 @@ export default function HeroPool({
               <span className="font-semibold">Pool:</span>
               <span className={`${controlsOpen ? 'text-slate-700' : 'text-slate-400'} ml-1`}>{poolMetadataLabel}</span>
             </button>
-            <div ref={poolMenuRef} className="relative">
-              <button
-                type="button"
-                aria-expanded={poolMenuOpen}
-                onClick={() => setPoolMenuOpen((value) => !value)}
-                className={compactButtonClass(editMode ? 'warning' : 'neutral', 'shrink-0 whitespace-nowrap')}
-              >
-                <span>My Pool</span>
-                <span className="ml-1 tabular-nums text-slate-400">{ownedIds?.size ?? 0}</span>
-              </button>
-              {poolMenuOpen && (
-                <MyPoolPopover
-                  ownedCount={ownedIds?.size ?? 0}
-                  editMode={editMode}
-                  onEditModeChange={onEditModeChange}
-                />
-              )}
-            </div>
+            <button
+              type="button"
+              aria-pressed={editMode}
+              onClick={() => onEditModeChange?.((value) => !value)}
+              className={compactButtonClass(editMode ? 'warning' : 'neutral', 'shrink-0 whitespace-nowrap')}
+              title={editMode ? 'Finish editing my pool' : 'Edit my hero pool'}
+            >
+              <span>{editMode ? 'Done' : 'Edit Pool'}</span>
+              <span className={`ml-1 tabular-nums ${editMode ? 'text-amber-200' : 'text-slate-400'}`}>{ownedIds?.size ?? 0}</span>
+            </button>
             <span className="shrink-0 whitespace-nowrap text-xs font-medium tabular-nums text-slate-400">
               {availableLabel}
             </span>
@@ -562,8 +524,17 @@ export default function HeroPool({
       </header>
 
       {editHint && (
-        <div className="rounded border border-amber-700 bg-amber-950/30 px-2 py-1 text-xs text-amber-200">
-          {editHint}
+        <div className="flex flex-wrap items-center gap-1.5 rounded border border-amber-700 bg-amber-950/30 px-2 py-1 text-xs text-amber-200">
+          <span className="min-w-0 flex-1">{editHint}</span>
+          <button
+            type="button"
+            disabled={visibleHeroIds.length === 0}
+            onClick={onToggleVisibleOwned}
+            className={buttonClass('warning', 'min-h-8 shrink-0 px-2 text-xs disabled:border-slate-700 disabled:bg-slate-900 disabled:text-slate-500')}
+            title={visibleHeroIds.length === 0 ? 'No heroes match the current filters' : `${visibleBulkLabel} in the current filtered list`}
+          >
+            {visibleBulkLabel}
+          </button>
         </div>
       )}
 
@@ -580,10 +551,11 @@ export default function HeroPool({
               type="button"
               disabled={!interactive && !canTeamDrag}
               onPointerDown={startTeamDrag(h, canTeamDrag)}
-              onMouseEnter={(e) => onHeroEnter?.(h.id, e.currentTarget)}
-              onMouseLeave={() => onHeroLeave?.()}
+              onMouseEnter={editMode ? undefined : (e) => onHeroEnter?.(h.id, e.currentTarget)}
+              onMouseLeave={editMode ? undefined : () => onHeroLeave?.()}
               onClick={() => handleClick(h)}
-              className={`group relative flex h-24 flex-col items-center justify-center gap-0.5 rounded-md p-0.5 text-left transition sm:h-[104px] lg:h-[112px]
+              className={`group relative flex h-24 flex-col items-center justify-center gap-0.5 rounded-md border p-0.5 text-left transition sm:h-[104px] lg:h-[112px]
+                ${editMode && owned ? 'border-amber-400/80 bg-amber-400/10 ring-1 ring-amber-300/60' : 'border-transparent'}
                 ${!editMode && used ? 'cursor-not-allowed opacity-30' : ''}
                 ${canTeamDrag ? 'touch-none' : ''}
                 ${interactive ? 'cursor-pointer hover:bg-slate-800/70' : canTeamDrag ? 'cursor-grab hover:bg-slate-800/70 active:cursor-grabbing' : 'cursor-not-allowed'}
@@ -592,16 +564,19 @@ export default function HeroPool({
               aria-label={`${h.name} (${h.role})`}
               title={!editMode && used ? `${h.name} - already used` : h.name}
             >
-              {owned && (
+              {!owned && (
                 <span
-                  aria-label="in my pool"
-                  className="pointer-events-none absolute right-0.5 top-0 z-10 text-sm leading-none text-slate-400 drop-shadow"
+                  aria-label="not in my pool"
+                  className="pointer-events-none absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-slate-950/75 text-slate-300 ring-1 ring-slate-600/80 drop-shadow"
                 >
-                  &#9733;
+                  <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="5" y="10" width="14" height="10" rx="2" />
+                    <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+                  </svg>
                 </span>
               )}
               <div className={`relative h-14 w-14 flex-none overflow-hidden rounded-full bg-slate-800 ring-1 sm:h-16 sm:w-16 lg:h-[72px] lg:w-[72px] ${
-                editMode && owned ? 'ring-amber-400' : 'ring-slate-700 group-hover:ring-slate-400'
+                'ring-slate-700 group-hover:ring-slate-400'
               }`}>
                 <img
                   src={api.portraitUrl(h.id)}

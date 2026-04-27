@@ -33,5 +33,11 @@ export default function useHeroPopover({ openDelay = 300, closeDelay = 120 } = {
     if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null }
   }, [])
 
-  return { hover, onHeroEnter, onHeroLeave, onPopoverKeep }
+  const clearHover = useCallback(() => {
+    if (openTimer.current) { clearTimeout(openTimer.current); openTimer.current = null }
+    if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null }
+    setHover(null)
+  }, [])
+
+  return { hover, onHeroEnter, onHeroLeave, onPopoverKeep, clearHover }
 }
