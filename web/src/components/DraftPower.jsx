@@ -4,9 +4,9 @@ const POWER_META = {
 }
 
 const BREAKDOWN_HELP = {
-  'Role Shape': 'Counts five draft jobs: frontline, damage core, magic pressure, utility/peel, and engage/pickoff.',
+  'Role Shape': 'Counts five draft jobs: frontline, damage core, control pressure, utility/peel, and engage/pickoff.',
   Frontline: 'Uses the two strongest durability/role bodies and adds a bonus when a durable hero also has hard engage.',
-  'Damage Spread': 'Classifies picked heroes as physical, magic, or mixed from role plus physical and magic stat balance.',
+  'Damage Spread': 'Classifies picked heroes as offense, control, or mixed from role plus offense and control balance.',
   'Control Chain': 'Counts hard and soft control words from skill text, then rewards multiple heroes that can chain control.',
   'Draft Links': 'Counts known teammate synergy pairs from the cached MLBB relation graph.',
   Tempo: 'Infers early, mid, and late game identity from roles and control/carry presence.',
@@ -55,14 +55,14 @@ function metricItems(power, leaderboardStatus) {
   const issue = leaderboardIssue(leaderboardStatus)
   return [
     {
-      label: 'Phys',
+      label: 'Offense',
       value: formatPercent(m.physicalPct),
-      title: `Physical proportion = sum of picked heroes' physical stat divided by physical + magic stat total. Raw physical power: ${m.physicalPower ?? 0}. Picks counted: ${pickCount}.`,
+      title: `Offense proportion = sum of picked heroes' offense divided by offense + control total. Raw offense power: ${m.physicalPower ?? 0}. Picks counted: ${pickCount}.`,
     },
     {
-      label: 'Magic',
+      label: 'Control',
       value: formatPercent(m.magicPct),
-      title: `Magic proportion = sum of picked heroes' magic stat divided by physical + magic stat total. Raw magic power: ${m.magicPower ?? 0}. Picks counted: ${pickCount}.`,
+      title: `Control proportion = sum of picked heroes' control divided by offense + control total. Raw control power: ${m.magicPower ?? 0}. Picks counted: ${pickCount}.`,
     },
     {
       label: 'Avg. WR',
@@ -85,9 +85,9 @@ function MetricPill({ item }) {
   return (
     <span
       title={item.title}
-      className="inline-flex min-w-0 items-center justify-center gap-1 rounded bg-slate-900/70 px-1 py-0.5 text-[9px] ring-1 ring-inset ring-slate-800"
+      className="inline-flex min-w-0 items-center justify-center gap-1 overflow-hidden rounded bg-slate-900/70 px-1 py-0.5 text-[9px] ring-1 ring-inset ring-slate-800"
     >
-      <span className="text-slate-500">{item.label}</span>
+      <span className="min-w-0 truncate text-slate-500">{item.label}</span>
       <span className="truncate font-semibold tabular-nums text-slate-200">{item.value}</span>
     </span>
   )
@@ -96,9 +96,9 @@ function MetricPill({ item }) {
 function TeamPowerCard({ team, power, leaderboardStatus }) {
   const meta = POWER_META[team]
   return (
-    <div className={`min-w-0 rounded bg-slate-950/40 px-2 py-1 ring-1 ring-inset ${meta.ring}`}>
-      <div className="flex items-center gap-1.5">
-        <span className={`text-[10px] font-semibold uppercase tracking-wider ${meta.text}`}>{meta.label}</span>
+    <div className={`min-w-0 overflow-hidden rounded bg-slate-950/40 px-2 py-1 ring-1 ring-inset ${meta.ring}`}>
+      <div className="flex min-w-0 items-center gap-1.5">
+        <span className={`min-w-0 truncate text-[10px] font-semibold uppercase tracking-wider ${meta.text}`}>{meta.label}</span>
         <span className={`ml-auto rounded px-1.5 py-0.5 text-[10px] font-bold tabular-nums ring-1 ring-inset ${powerTone(power?.score)}`}>
           {scoreText(power)}
         </span>
@@ -106,7 +106,7 @@ function TeamPowerCard({ team, power, leaderboardStatus }) {
       <div className="mt-0.5 truncate text-center text-[10px] text-slate-400" title={power?.summary}>
         {power?.summary ?? 'Pick heroes to evaluate draft power.'}
       </div>
-      <div className="mt-1 grid grid-cols-2 gap-1">
+      <div className="mt-1 grid grid-cols-[repeat(2,minmax(0,1fr))] gap-1">
         {metricItems(power, leaderboardStatus).map((item) => (
           <MetricPill key={item.label} item={item} />
         ))}
@@ -131,18 +131,18 @@ export default function DraftPower({ draftPowers, leaderboardStatus }) {
   const rows = ally?.breakdown?.length ? ally.breakdown : enemy?.breakdown ?? []
 
   return (
-    <section className="grid min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] gap-2 rounded-lg border border-slate-800 bg-slate-900/40 p-2">
-      <header className="flex h-4 items-center gap-2">
+    <section className="grid min-h-0 min-w-0 grid-rows-[auto_auto_minmax(0,1fr)] gap-2 overflow-hidden rounded-lg border border-slate-800 bg-slate-900/40 p-2">
+      <header className="flex h-4 min-w-0 items-center gap-2">
         <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-300">Draft Power</h2>
         <span className="ml-auto text-[9px] uppercase tracking-wider text-slate-600">display only</span>
       </header>
 
-      <div className="grid grid-cols-2 gap-1.5">
+      <div className="grid min-w-0 grid-cols-[repeat(2,minmax(0,1fr))] gap-1.5">
         <TeamPowerCard team="ally" power={ally} leaderboardStatus={leaderboardStatus} />
         <TeamPowerCard team="enemy" power={enemy} leaderboardStatus={leaderboardStatus} />
       </div>
 
-      <div className="min-h-0 overflow-y-auto pr-1">
+      <div className="min-h-0 min-w-0 overflow-x-hidden overflow-y-auto pr-1">
         {rows.map((row, i) => {
           const allyRow = ally?.breakdown?.[i]
           const enemyRow = enemy?.breakdown?.[i]
@@ -156,7 +156,7 @@ export default function DraftPower({ draftPowers, leaderboardStatus }) {
             <div
               key={row.label}
               title={title}
-              className="grid grid-cols-[42px_minmax(0,1fr)_42px] items-center gap-2 border-t border-slate-800/80 py-0.5"
+              className="grid min-w-0 grid-cols-[34px_minmax(0,1fr)_34px] items-center gap-2 border-t border-slate-800/80 py-0.5"
             >
               <BreakdownValue row={allyRow} team="ally" />
               <span className="min-w-0 truncate text-center text-[10px] text-slate-400">

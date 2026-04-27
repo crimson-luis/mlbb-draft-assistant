@@ -20,9 +20,13 @@ const RANK_STORAGE_KEY = 'mlbb:rank'
 const LANE_STORAGE_KEY = 'mlbb:lane'
 const BAN_COUNT_STORAGE_KEY = 'mlbb:banCount'
 const RECS_H_STORAGE_KEY = 'mlbb:recsH'
+const DRAFT_POWER_W_STORAGE_KEY = 'mlbb:draftPowerW'
 const RECS_H_MIN = 192
 const RECS_H_MAX = 620
 const RECS_H_DEFAULT = 220
+const DRAFT_POWER_W_MIN = 260
+const DRAFT_POWER_W_MAX = 520
+const DRAFT_POWER_W_DEFAULT = 360
 const RANKS = ['all', 'epic', 'legend', 'mythic', 'honor', 'glory']
 
 // Ban-count defaults by rank tier (MLBB in-game rules):
@@ -79,6 +83,16 @@ function loadRecsH() {
   }
 }
 
+function loadDraftPowerW() {
+  try {
+    const v = Number(localStorage.getItem(DRAFT_POWER_W_STORAGE_KEY))
+    if (Number.isFinite(v) && v >= DRAFT_POWER_W_MIN && v <= DRAFT_POWER_W_MAX) return v
+    return DRAFT_POWER_W_DEFAULT
+  } catch {
+    return DRAFT_POWER_W_DEFAULT
+  }
+}
+
 // Drag handle that lets the user resize the recommendations panel by dragging
 // the divider between HeroPool and Recommendations. Uses pointer capture so the
 // drag continues smoothly even if the cursor leaves the handle.
@@ -126,6 +140,48 @@ function ResizeHandle({ height, onResize }) {
   )
 }
 
+function VerticalResizeHandle({ width, onResize }) {
+  const startRef = useRef(null)
+  const onPointerDown = (e) => {
+    e.preventDefault()
+    startRef.current = { x: e.clientX, w: width, target: e.currentTarget, pointerId: e.pointerId }
+    try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* ignore */ }
+    const onMove = (ev) => {
+      if (!startRef.current) return
+      const dx = ev.clientX - startRef.current.x
+      const next = Math.max(DRAFT_POWER_W_MIN, Math.min(DRAFT_POWER_W_MAX, startRef.current.w - dx))
+      onResize(next)
+    }
+    const onUp = () => {
+      const s = startRef.current
+      startRef.current = null
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+      if (s?.target && s.pointerId != null) {
+        try { s.target.releasePointerCapture(s.pointerId) } catch { /* ignore */ }
+      }
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
+  }
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-valuenow={width}
+      aria-valuemin={DRAFT_POWER_W_MIN}
+      aria-valuemax={DRAFT_POWER_W_MAX}
+      title="Drag to resize draft power panel"
+      onPointerDown={onPointerDown}
+      className="group relative hidden h-full w-2 cursor-col-resize touch-none select-none xl:block"
+    >
+      <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-slate-700 transition group-hover:w-0.5 group-hover:bg-slate-500" />
+    </div>
+  )
+}
+
 export default function App() {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
@@ -140,6 +196,7 @@ export default function App() {
   const [lane, setLane] = useState(loadLane)
   const [banCountPref, setBanCountPref] = useState(loadBanCount)
   const [recsH, setRecsH] = useState(loadRecsH)
+  const [draftPowerW, setDraftPowerW] = useState(loadDraftPowerW)
 
   const { state, actions, usedIds, recommendPayload, selectingSlot } = useDraftState()
   const { hover: popHover, onHeroEnter, onHeroLeave, onPopoverKeep } = useHeroPopover()
@@ -184,6 +241,10 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem(RECS_H_STORAGE_KEY, String(recsH)) } catch { /* ignore */ }
   }, [recsH])
+
+  useEffect(() => {
+    try { localStorage.setItem(DRAFT_POWER_W_STORAGE_KEY, String(draftPowerW)) } catch { /* ignore */ }
+  }, [draftPowerW])
 
   const onBanCountChange = useCallback((n) => {
     // Clicking the rank default while it's already selected clears the override
@@ -450,7 +511,10 @@ export default function App() {
                 onDropToSlot={onPoolDropToSlot}
               />
               <ResizeHandle height={recsH} onResize={setRecsH} />
-              <div className="grid min-h-0 gap-2 overflow-y-auto xl:grid-cols-[minmax(0,1fr)_360px] xl:overflow-hidden">
+              <div
+                className="grid min-h-0 min-w-0 gap-2 overflow-x-hidden overflow-y-auto xl:grid-cols-[minmax(0,1fr)_8px_minmax(var(--draft-power-w),var(--draft-power-w))] xl:gap-0 xl:overflow-hidden"
+                style={{ '--draft-power-w': `${draftPowerW}px` }}
+              >
                 <Recommendations
                   recommendations={recs}
                   heroesById={heroesById}
@@ -463,6 +527,7 @@ export default function App() {
                   leaderboardStats={statsByHeroId}
                   rankTotal={rankTotal}
                 />
+                <VerticalResizeHandle width={draftPowerW} onResize={setDraftPowerW} />
                 <DraftPower draftPowers={draftPowers} leaderboardStatus={leaderboardStatus} />
               </div>
             </section>

@@ -15,6 +15,15 @@ mixed with a one-shot local scrape of the full hero roster.
 
 ---
 
+## Full app view
+
+![Full MLBB Draft Assistant app](docs/screenshots/full-app.png)
+
+The main screen keeps both draft columns, the searchable hero pool, live
+recommendations, and draft power visible in one workspace.
+
+---
+
 ## Why use it
 
 A draft in MLBB takes ~60 seconds. You don't have time to remember every

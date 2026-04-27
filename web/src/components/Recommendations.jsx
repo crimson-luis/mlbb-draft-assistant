@@ -55,7 +55,7 @@ function ReasonPill({ reason, tip }) {
   return (
     <span
       title={title}
-      className={`inline-flex max-w-full cursor-help items-center gap-1 truncate rounded px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset ${tone}`}
+      className={`inline-flex max-w-full cursor-help items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset ${tone}`}
     >
       <span className="truncate">{label}</span>
       <span className="flex-none opacity-70">{sign}{reason.points}</span>
@@ -77,28 +77,32 @@ function RecommendationCard({ rec, heroesById, onHeroEnter, onHeroLeave, stats, 
       ref={ref}
       onMouseEnter={() => onHeroEnter?.(rec.hero_id, ref.current)}
       onMouseLeave={() => onHeroLeave?.()}
-      className="flex h-[96px] w-[220px] flex-none snap-start gap-2 rounded-lg border border-slate-800 bg-slate-900/60 p-2 transition hover:border-slate-600"
+      className="grid min-w-0 grid-cols-[52px_minmax(0,1fr)] gap-2 rounded-md border border-slate-800 bg-slate-900/60 p-1.5 transition hover:border-slate-600"
     >
-      <div className="relative h-[80px] w-[80px] flex-none overflow-hidden rounded-md bg-slate-800 ring-1 ring-slate-700">
+      <div className="relative h-[52px] w-[52px] flex-none overflow-hidden rounded bg-slate-800 ring-1 ring-slate-700">
         <img
           src={api.portraitUrl(rec.hero_id)}
           alt={rec.name}
           className="h-full w-full object-cover"
         />
       </div>
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <div className="flex items-center gap-1.5">
-          {stats?.rank ? (
-            <span className={`flex-none tabular-nums text-[10px] ${rankTextTone(stats.rank, rankTotal)}`}>#{stats.rank}</span>
-          ) : null}
-          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-100">{rec.name}</span>
-          <WrDot wr={stats?.win_rate} className="flex-none" />
-          <span className={`flex-none text-base font-bold tabular-nums ${scoreColor}`}>
+      <div className="flex min-w-0 flex-col gap-1">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+          <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-1.5">
+              {stats?.rank ? (
+                <span className={`flex-none tabular-nums text-[10px] ${rankTextTone(stats.rank, rankTotal)}`}>#{stats.rank}</span>
+              ) : null}
+              <span className="min-w-0 truncate text-sm font-semibold leading-4 text-slate-100">{rec.name}</span>
+              <WrDot wr={stats?.win_rate} size="xs" className="flex-none" />
+            </div>
+            <span className="block truncate text-[9px] uppercase tracking-widest text-slate-500">{rec.role}</span>
+          </div>
+          <span className={`flex-none text-base font-bold leading-5 tabular-nums ${scoreColor}`}>
             {rec.score > 0 ? '+' : ''}{rec.score}
           </span>
         </div>
-        <span className="text-[9px] uppercase tracking-widest text-slate-500">{rec.role}</span>
-        <div className="mt-auto flex min-w-0 flex-col gap-0.5">
+        <div className="flex min-w-0 flex-wrap gap-1 overflow-hidden">
           {topReasons.length === 0 ? (
             <span className="text-[10px] text-slate-500">No specific counter/synergy data.</span>
           ) : (
@@ -114,8 +118,8 @@ function RecommendationCard({ rec, heroesById, onHeroEnter, onHeroLeave, stats, 
 
 export default function Recommendations({ recommendations, heroesById, loading, error, hasInput, filterToOwnedActive, onHeroEnter, onHeroLeave, leaderboardStats, rankTotal }) {
   return (
-    <section className="flex min-h-0 flex-col gap-1 rounded-lg border border-slate-800 bg-slate-900/40 p-2">
-      <header className="flex h-4 items-center gap-2">
+    <section className="flex min-h-0 min-w-0 flex-col gap-1 overflow-hidden rounded-lg border border-slate-800 bg-slate-900/40 p-2">
+      <header className="flex min-h-4 min-w-0 flex-wrap items-center gap-2">
         <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-300">Recommendations</h2>
         {filterToOwnedActive && (
           <span className="rounded bg-amber-500/15 px-1.5 py-0 text-[10px] font-medium text-amber-300 ring-1 ring-inset ring-amber-500/30">
@@ -136,7 +140,7 @@ export default function Recommendations({ recommendations, heroesById, loading, 
         )}
       </header>
 
-      <div className="flex min-h-0 flex-1 snap-x gap-2 overflow-x-auto overflow-y-hidden pr-2">
+      <div className="grid min-h-0 min-w-0 flex-1 auto-rows-max gap-1.5 overflow-x-hidden overflow-y-auto pr-1">
         {recommendations.map((rec) => (
           <RecommendationCard
             key={rec.hero_id}
