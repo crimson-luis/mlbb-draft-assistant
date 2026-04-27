@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { buttonClass, selectClass } from './buttonStyles'
 
 function titleCase(value) {
   return value ? value[0].toUpperCase() + value.slice(1) : value
@@ -10,11 +11,7 @@ function SegmentedButton({ active, children, onClick, title }) {
       type="button"
       onClick={onClick}
       title={title}
-      className={`min-h-8 rounded px-2.5 py-1 text-xs font-medium transition ${
-        active
-          ? 'bg-slate-100 text-slate-950'
-          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-      }`}
+      className={buttonClass(active ? 'active' : 'neutral')}
     >
       {children}
     </button>
@@ -65,7 +62,7 @@ function DraftSettingsPopover({
           <select
             value={lane}
             onChange={(e) => onLaneChange(e.target.value)}
-            className="min-h-9 rounded-md border border-slate-700 bg-slate-900 px-2 text-sm text-slate-100 outline-none focus:border-slate-400"
+            className={selectClass}
           >
             {lanes.map((value) => (
               <option key={value} value={value}>{laneLabels[value] ?? value}</option>
@@ -135,7 +132,7 @@ export default function HeaderBar({
 
   return (
     <header className="relative z-[100] border-b border-slate-800 bg-slate-900/70 backdrop-blur">
-      <div className="mx-auto flex min-h-11 max-w-[1600px] items-center gap-2 px-3 py-1.5 sm:px-6">
+      <div className="flex min-h-10 w-full items-center gap-2 px-1 py-1 sm:px-3">
         <h1 className="min-w-0 flex-1 truncate text-base font-semibold tracking-tight sm:text-lg">
           MLBB Draft Assistant
         </h1>
@@ -144,16 +141,16 @@ export default function HeaderBar({
             type="button"
             aria-expanded={open}
             onClick={() => setOpen((value) => !value)}
-            className="min-h-8 max-w-[52vw] rounded-md border border-slate-700 bg-slate-800 px-2.5 py-1 text-left text-xs text-slate-200 hover:bg-slate-700 focus:border-slate-400 focus:outline-none sm:max-w-none"
+            className={buttonClass(open ? 'active' : 'neutral', 'max-w-[52vw] justify-start text-left sm:max-w-none')}
             title="Draft settings"
           >
-            <span className="font-semibold text-slate-100">Draft</span>
-            <span className="hidden text-slate-400 sm:inline"> - {summary}</span>
+            <span className="font-semibold">Draft</span>
+            <span className={`hidden sm:inline ${open ? 'text-slate-700' : 'text-slate-400'}`}> - {summary}</span>
           </button>
           <button
             type="button"
             onClick={onReset}
-            className="min-h-8 rounded-md bg-slate-800 px-2.5 py-1 text-xs font-medium text-slate-200 hover:bg-slate-700"
+            className={buttonClass('neutral')}
           >
             Reset
           </button>

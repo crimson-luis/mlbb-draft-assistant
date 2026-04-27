@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import { rankTextTone, WrDot } from './HeroOverlay'
 import { LANE_LABELS, LANE_ORDER, LANE_ROLES } from '../lanes'
+import { buttonClass, compactButtonClass, searchInputClass, selectClass } from './buttonStyles'
 
 const DRAG_START_THRESHOLD = 8
 
@@ -65,7 +66,7 @@ const FILTER_MODE_STORAGE_KEY = 'mlbb.heroPool.filterMode'
 function loadFilterMode() {
   try {
     const v = localStorage.getItem(FILTER_MODE_STORAGE_KEY)
-    return v === 'role' ? 'role' : 'lane'
+    return v === 'role' || v === 'pool' ? v : 'lane'
   } catch {
     return 'lane'
   }
@@ -80,6 +81,7 @@ const SORT_FIELDS = [
 ]
 const SORT_FIELD_BY_VALUE = Object.fromEntries(SORT_FIELDS.map((f) => [f.value, f]))
 const SORT_STORAGE_KEY = 'mlbb.heroPool.sort'
+const SORT_ARROW = { asc: '\u2191', desc: '\u2193' }
 
 function loadSort() {
   try {
@@ -97,9 +99,7 @@ function loadSort() {
 function MyPoolPopover({
   ownedCount,
   editMode,
-  filterToOwned,
   onEditModeChange,
-  onFilterToOwnedChange,
 }) {
   return (
     <div className="absolute right-0 top-[calc(100%+0.4rem)] z-40 w-[calc(100vw-2rem)] max-w-72 rounded-lg border border-slate-700 bg-slate-950 p-3 shadow-2xl shadow-black/40 sm:w-72">
@@ -111,29 +111,10 @@ function MyPoolPopover({
         <button
           type="button"
           onClick={() => onEditModeChange((value) => !value)}
-          className={`min-h-9 rounded-md px-2.5 py-1 text-left text-sm font-medium transition ${
-            editMode
-              ? 'bg-amber-400 text-slate-950 hover:bg-amber-300'
-              : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
-          }`}
+          className={buttonClass(editMode ? 'warning' : 'neutral', 'min-h-9 justify-start text-sm')}
         >
           {editMode ? 'Done editing' : 'Edit pool'}
         </button>
-        <label
-          className={`flex min-h-9 items-center gap-2 rounded-md bg-slate-900 px-2.5 py-1 text-sm text-slate-200 ring-1 ring-inset ring-slate-800 ${
-            ownedCount === 0 ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-slate-800'
-          }`}
-          title={ownedCount === 0 ? 'Add heroes to your pool first' : 'Only suggest heroes you own'}
-        >
-          <input
-            type="checkbox"
-            checked={filterToOwned}
-            disabled={ownedCount === 0}
-            onChange={(e) => onFilterToOwnedChange(e.target.checked)}
-            className="h-3.5 w-3.5 accent-amber-400"
-          />
-          Only recommend my pool
-        </label>
       </div>
     </div>
   )
@@ -146,9 +127,7 @@ export default function HeroPool({
   onPick,
   editMode,
   ownedIds,
-  filterToOwned,
   onEditModeChange,
-  onFilterToOwnedChange,
   onToggleOwned,
   onHeroEnter,
   onHeroLeave,
@@ -164,6 +143,7 @@ export default function HeroPool({
   const [sort, setSort] = useState(loadSort)
   const [dragState, setDragState] = useState(null)
   const [poolMenuOpen, setPoolMenuOpen] = useState(false)
+  const [controlsOpen, setControlsOpen] = useState(false)
   const poolRef = useRef(null)
   const poolMenuRef = useRef(null)
   const pendingDragRef = useRef(null)
@@ -256,6 +236,9 @@ export default function HeroPool({
     const laneRoles = filterMode === 'lane' ? LANE_ROLES[laneFilter] : null
     const filtered = heroes
       .filter((h) => {
+        if (filterMode === 'pool') {
+          return ownedIds?.has(h.id)
+        }
         if (filterMode === 'role') {
           return roleFilter === 'All' ? true : h.role === roleFilter
         }
@@ -285,7 +268,7 @@ export default function HeroPool({
       if (av === bv) return nameCmp(a, b)
       return sign * (av - bv)
     })
-  }, [heroes, query, roleFilter, laneFilter, filterMode, sort, leaderboardStats])
+  }, [heroes, query, roleFilter, laneFilter, filterMode, sort, leaderboardStats, ownedIds])
 
   const handleClick = (hero) => {
     if (suppressClickRef.current) {
@@ -299,6 +282,16 @@ export default function HeroPool({
   const editHint = editMode
     ? 'Edit mode: click heroes to add/remove them from your pool.'
     : null
+  const totalCount = heroes.length
+  const availableCount = Math.max(0, totalCount - usedIds.size)
+  const activeFilterLabel =
+    filterMode === 'pool' ? 'My Pool' :
+    filterMode === 'role' ? `${ROLE_LABELS[roleFilter] ?? roleFilter}` :
+    `${LANE_LABELS[laneFilter] ?? laneFilter}`
+  const activeSortField = SORT_FIELD_BY_VALUE[sort.field] ?? SORT_FIELD_BY_VALUE.name
+  const activeSortLabel = `${activeSortField.label} ${SORT_ARROW[sort.dir] ?? ''}`.trim()
+  const poolMetadataLabel = `${activeFilterLabel} / ${activeSortLabel}`
+  const availableLabel = `${availableCount}/${totalCount}`
 
   const startTeamDrag = (hero, canTeamDrag) => (e) => {
     if (!canTeamDrag || e.button !== 0) return
@@ -449,107 +442,123 @@ export default function HeroPool({
         </>
       )}
 
-      <header className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-        <div className="inline-flex overflow-hidden rounded ring-1 ring-slate-700">
-          {['lane', 'role'].map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setFilterMode(m)}
-              className={`px-2 py-0.5 text-xs transition ${
-                filterMode === m
-                  ? 'bg-slate-100 text-slate-900'
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-              }`}
-              title={m === 'lane' ? 'Filter by lane' : 'Filter by role'}
-            >
-              {m === 'lane' ? 'Lane' : 'Role'}
-            </button>
-          ))}
-        </div>
-        <div className="flex flex-wrap items-center gap-1">
-          {filterMode === 'lane'
-            ? LANE_ORDER.map((l) => (
-                <button
-                  key={l}
-                  onClick={() => setLaneFilter(l)}
-                  className={`rounded px-2 py-0.5 text-xs transition ${
-                    laneFilter === l
-                      ? 'bg-slate-100 text-slate-900'
-                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                  }`}
-                >
-                  {LANE_LABELS[l] ?? l}
-                </button>
-              ))
-            : ROLES.map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setRoleFilter(r)}
-                  className={`rounded px-2 py-0.5 text-xs transition ${
-                    roleFilter === r
-                      ? 'bg-slate-100 text-slate-900'
-                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                  }`}
-                >
-                  {ROLE_LABELS[r] ?? r}
-                </button>
-              ))}
-        </div>
-        <span className="text-xs text-slate-500">{list.length} shown</span>
-        <div className="flex w-full flex-wrap items-center gap-1 sm:ml-auto sm:w-auto">
-          <div ref={poolMenuRef} className="relative">
-            <button
-              type="button"
-              aria-expanded={poolMenuOpen}
-              onClick={() => setPoolMenuOpen((value) => !value)}
-              className={`rounded-md border px-2 py-1 text-xs font-medium transition ${
-                editMode || filterToOwned
-                  ? 'border-amber-400/50 bg-amber-400/10 text-amber-200 hover:bg-amber-400/15'
-                  : 'border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700'
-              }`}
-            >
-              My Pool <span className="tabular-nums text-slate-400">{ownedIds?.size ?? 0}</span>
-            </button>
-            {poolMenuOpen && (
-              <MyPoolPopover
-                ownedCount={ownedIds?.size ?? 0}
-                editMode={editMode}
-                filterToOwned={filterToOwned}
-                onEditModeChange={onEditModeChange}
-                onFilterToOwnedChange={onFilterToOwnedChange}
-              />
-            )}
-          </div>
-          <label className="flex items-center gap-1 text-xs text-slate-400">
-            <span>Sort</span>
-            <select
-              value={sort.field}
-              onChange={(e) => setSortField(e.target.value)}
-              className="rounded-md border border-slate-700 bg-slate-800 px-1.5 py-1 text-xs text-slate-100 focus:border-slate-400 focus:outline-none"
-            >
-              {SORT_FIELDS.map((f) => (
-                <option key={f.value} value={f.value}>{f.label}</option>
-              ))}
-            </select>
-          </label>
-          <button
-            type="button"
-            onClick={toggleSortDir}
-            aria-label={`Sort direction: ${sort.dir === 'asc' ? 'ascending' : 'descending'}`}
-            title={sort.dir === 'asc' ? 'Ascending - click to flip' : 'Descending - click to flip'}
-            className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-200 hover:bg-slate-700 focus:border-slate-400 focus:outline-none"
-          >
-            {sort.dir === 'asc' ? '\u2191' : '\u2193'}
-          </button>
+      <header className="grid gap-1.5">
+        <div className="grid min-w-0 gap-1.5 sm:flex sm:items-center">
           <input
             type="search"
             placeholder="Search heroes..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="min-w-[160px] flex-1 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-sm placeholder-slate-500 focus:border-slate-400 focus:outline-none sm:w-[180px] sm:flex-none"
+            className={`${searchInputClass} min-w-0 flex-1`}
           />
+          <div className="-mx-1 flex min-w-0 items-center gap-1 overflow-x-auto px-1 sm:mx-0 sm:shrink-0 sm:overflow-visible sm:px-0">
+            <button
+              type="button"
+              aria-expanded={controlsOpen}
+              onClick={() => setControlsOpen((value) => !value)}
+              className={compactButtonClass(controlsOpen ? 'active' : 'neutral', 'shrink-0 whitespace-nowrap justify-start text-left')}
+              title="Hero pool filters and sorting"
+            >
+              <span className="font-semibold">Pool:</span>
+              <span className={`${controlsOpen ? 'text-slate-700' : 'text-slate-400'} ml-1`}>{poolMetadataLabel}</span>
+            </button>
+            <div ref={poolMenuRef} className="relative">
+              <button
+                type="button"
+                aria-expanded={poolMenuOpen}
+                onClick={() => setPoolMenuOpen((value) => !value)}
+                className={compactButtonClass(editMode ? 'warning' : 'neutral', 'shrink-0 whitespace-nowrap')}
+              >
+                <span>My Pool</span>
+                <span className="ml-1 tabular-nums text-slate-400">{ownedIds?.size ?? 0}</span>
+              </button>
+              {poolMenuOpen && (
+                <MyPoolPopover
+                  ownedCount={ownedIds?.size ?? 0}
+                  editMode={editMode}
+                  onEditModeChange={onEditModeChange}
+                />
+              )}
+            </div>
+            <span className="shrink-0 whitespace-nowrap text-xs font-medium tabular-nums text-slate-400">
+              {availableLabel}
+            </span>
+          </div>
         </div>
+        {controlsOpen && (
+          <div className="grid gap-1.5 rounded-md border border-slate-800 bg-slate-950/30 p-1.5">
+            <div className="flex min-w-0 items-center gap-1">
+              <div className="inline-flex shrink-0 overflow-hidden rounded-md border border-slate-700 bg-slate-950/35">
+                {['lane', 'role', 'pool'].map((m, index) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setFilterMode(m)}
+                    className={compactButtonClass(
+                      filterMode === m ? 'active' : 'neutral',
+                      `${index === 0 ? 'rounded-r-none' : index === 2 ? 'rounded-l-none' : 'rounded-none'} border-transparent`
+                    )}
+                    title={
+                      m === 'lane' ? 'Filter by lane' :
+                      m === 'role' ? 'Filter by role' :
+                      'Show only heroes in my pool'
+                    }
+                  >
+                    {m === 'lane' ? 'Lane' : m === 'role' ? 'Role' : 'Pool'}
+                  </button>
+                ))}
+              </div>
+              <label className="ml-auto flex min-w-0 items-center gap-1 text-xs text-slate-400">
+                <span className="shrink-0">Sort</span>
+                <select
+                  value={sort.field}
+                  onChange={(e) => setSortField(e.target.value)}
+                  className={`${selectClass} min-h-7 min-w-0 py-0.5`}
+                >
+                  {SORT_FIELDS.map((f) => (
+                    <option key={f.value} value={f.value}>{f.label}</option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={toggleSortDir}
+                aria-label={`Sort direction: ${sort.dir === 'asc' ? 'ascending' : 'descending'}`}
+                title={sort.dir === 'asc' ? 'Ascending - click to flip' : 'Descending - click to flip'}
+                className={compactButtonClass('neutral', 'w-7 shrink-0 px-0')}
+              >
+                {SORT_ARROW[sort.dir]}
+              </button>
+            </div>
+            {filterMode !== 'pool' && (
+              <div className="-mx-1 overflow-x-auto px-1 sm:mx-0 sm:overflow-visible sm:px-0">
+                <div className="flex w-max items-center gap-1 sm:w-auto sm:flex-wrap">
+                  {filterMode === 'lane'
+                    ? LANE_ORDER.map((l) => (
+                        <button
+                          key={l}
+                          type="button"
+                          onClick={() => setLaneFilter(l)}
+                          className={compactButtonClass(laneFilter === l ? 'active' : 'neutral', 'shrink-0 whitespace-nowrap')}
+                        >
+                          {LANE_LABELS[l] ?? l}
+                        </button>
+                      ))
+                    : ROLES.map((r) => (
+                        <button
+                          key={r}
+                          type="button"
+                          onClick={() => setRoleFilter(r)}
+                          className={compactButtonClass(roleFilter === r ? 'active' : 'neutral', 'shrink-0 whitespace-nowrap')}
+                        >
+                          {ROLE_LABELS[r] ?? r}
+                        </button>
+                      ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </header>
 
       {editHint && (
