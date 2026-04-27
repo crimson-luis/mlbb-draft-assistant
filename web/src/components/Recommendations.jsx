@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { api } from '../api'
 import { rankTextTone, WrDot } from './HeroOverlay'
+import { compactButtonClass } from './buttonStyles'
 
 const REASON_LABELS = {
   counters: (r) => `Counters ${r.target_name}`,
@@ -116,16 +117,41 @@ function RecommendationCard({ rec, heroesById, onHeroEnter, onHeroLeave, stats, 
   )
 }
 
-export default function Recommendations({ recommendations, heroesById, loading, error, hasInput, filterToOwnedActive, onHeroEnter, onHeroLeave, leaderboardStats, rankTotal }) {
+export default function Recommendations({
+  recommendations,
+  heroesById,
+  loading,
+  error,
+  hasInput,
+  filterToOwned,
+  filterToOwnedActive,
+  ownedCount,
+  onFilterToOwnedChange,
+  onHeroEnter,
+  onHeroLeave,
+  leaderboardStats,
+  rankTotal,
+}) {
   return (
     <section className="flex min-h-0 min-w-0 flex-col gap-1 overflow-hidden rounded-lg border border-slate-800 bg-slate-900/40 p-2">
       <header className="flex min-h-4 min-w-0 flex-wrap items-center gap-2">
         <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-300">Recommendations</h2>
-        {filterToOwnedActive && (
-          <span className="rounded bg-amber-500/15 px-1.5 py-0 text-[10px] font-medium text-amber-300 ring-1 ring-inset ring-amber-500/30">
-            filtered to my pool
-          </span>
-        )}
+        <label
+          className={compactButtonClass(
+            filterToOwnedActive ? 'warning' : 'neutral',
+            `min-h-6 cursor-pointer gap-1 px-1.5 py-0 text-[10px] ${ownedCount === 0 ? 'cursor-not-allowed opacity-50' : ''}`
+          )}
+          title={ownedCount === 0 ? 'Add heroes to your pool first' : 'Only recommend heroes in my pool'}
+        >
+          <input
+            type="checkbox"
+            checked={filterToOwned}
+            disabled={ownedCount === 0}
+            onChange={(e) => onFilterToOwnedChange(e.target.checked)}
+            className="h-3 w-3 accent-amber-400"
+          />
+          Pool only
+        </label>
         {loading && <span className="text-[10px] text-slate-500">scoring...</span>}
         {!hasInput && !loading && !error && (
           <span className="ml-2 text-[10px] text-slate-500">Pick someone to see suggestions.</span>

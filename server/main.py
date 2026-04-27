@@ -56,9 +56,14 @@ HERO_NAMES: dict[int, str] = {
 
 app = FastAPI(title="MLBB Draft Assistant API", version=HERO_DATA.get("version", "dev"))
 
+FRONTEND_ORIGINS = os.environ.get(
+    "FRONTEND_ORIGINS",
+    "http://localhost:5173,http://127.0.0.1:5173"
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=FRONTEND_ORIGINS,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )

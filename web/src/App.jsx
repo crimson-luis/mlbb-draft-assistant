@@ -499,9 +499,7 @@ export default function App() {
                 onPick={onPoolPick}
                 editMode={poolEditMode}
                 ownedIds={ownedIds}
-                filterToOwned={filterToOwned}
                 onEditModeChange={setPoolEditMode}
-                onFilterToOwnedChange={setFilterToOwned}
                 onToggleOwned={toggleOwned}
                 onHeroEnter={onHeroEnter}
                 onHeroLeave={onHeroLeave}
@@ -521,7 +519,10 @@ export default function App() {
                   loading={recsLoading}
                   error={recsError}
                   hasInput={hasInput}
+                  filterToOwned={filterToOwned}
                   filterToOwnedActive={filterToOwnedActive}
+                  ownedCount={ownedIds.size}
+                  onFilterToOwnedChange={setFilterToOwned}
                   onHeroEnter={onHeroEnter}
                   onHeroLeave={onHeroLeave}
                   leaderboardStats={statsByHeroId}
